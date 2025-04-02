@@ -1,28 +1,38 @@
-import networkx as nx
 import matplotlib.pyplot as plt
+import networkx as nx
 
-def afficher_graphe(graphe, parcours=None, coloriage=None, titre="Graph"):
+def afficher_graphe(graph, parcours=None, coloriage=None, titre="", weighted=False):
     G = nx.Graph()
-
-    for noeud, voisins in graphe.items():
-        for voisin in voisins:
-            G.add_edge(noeud, voisin)
-
+    
+    # Add edges with weights if present
+    for node, neighbors in graph.items():
+        if isinstance(neighbors, dict):  # Weighted graph
+            for neighbor, weight in neighbors.items():
+                G.add_edge(node, neighbor, weight=weight)
+        else:  # Unweighted graph
+            for neighbor in neighbors:
+                G.add_edge(node, neighbor)
+    
     pos = nx.spring_layout(G)
-    plt.figure(figsize=(6, 4))
-
+    plt.figure(figsize=(10, 8))
+    
+    # Draw the graph
+    if weighted:
+        edge_labels = nx.get_edge_attributes(G, 'weight')
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+    
     if parcours:
-        for i, n in enumerate(parcours):
-            plt.clf()
-            nx.draw(G, pos, with_labels=True, node_color='lightgray', edge_color='gray', node_size=2000, font_size=10)
-            couleurs = ['blue' if x in parcours[:i+1] else 'lightgray' for x in G.nodes()]
-            nx.draw(G, pos, with_labels=True, node_color=couleurs, edge_color='gray', node_size=2000, font_size=10)
-            plt.title(f"{titre} - Step {i+1}/{len(parcours)}")
-            plt.pause(0.5)
-
+        # Highlight path
+        path_edges = list(zip(parcours, parcours[1:]))
+        edge_colors = ['red' if edge in path_edges or tuple(reversed(edge)) in path_edges 
+                      else 'gray' for edge in G.edges()]
+        nx.draw(G, pos, with_labels=True, edge_color=edge_colors, width=2)
     elif coloriage:
-        couleurs = [coloriage[n] for n in G.nodes()]
-        nx.draw(G, pos, with_labels=True, node_color=couleurs, cmap=plt.cm.Set1, edge_color='gray', node_size=2000, font_size=10)
-        plt.title("Graph Coloring")
-
+        # Color nodes
+        colors = [coloriage[node] for node in G.nodes()]
+        nx.draw(G, pos, with_labels=True, node_color=colors, cmap=plt.cm.tab10)
+    else:
+        nx.draw(G, pos, with_labels=True)
+    
+    plt.title(titre)
     plt.show()

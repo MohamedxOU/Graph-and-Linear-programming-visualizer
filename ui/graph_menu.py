@@ -31,6 +31,18 @@ class GraphMenu(QWidget):
         self.btn_coloring.setObjectName("algorithmButton")
         button_layout.addWidget(self.btn_coloring)
         
+        self.btn_dijkstra = QPushButton("Dijkstra's Algorithm")
+        self.btn_dijkstra.clicked.connect(self.go_to_dijkstra)
+        self.btn_dijkstra.setObjectName("algorithmButton")  # Added missing styling
+        button_layout.addWidget(self.btn_dijkstra)  # Add to button_layout, not undefined 'layout'
+        
+        
+        self.btn_astar = QPushButton("A* Algorithm")
+        self.btn_astar.clicked.connect(self.go_to_astar)
+        self.btn_astar.setObjectName("algorithmButton")
+        button_layout.addWidget(self.btn_astar)
+
+        
         # Add spacer to center the buttons vertically
         main_layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         main_layout.addLayout(button_layout)
@@ -92,10 +104,22 @@ class GraphMenu(QWidget):
         self.stack.addWidget(coloring_page)
         self.stack.setCurrentWidget(coloring_page)
         
+    def go_to_dijkstra(self):
+        from ui.dijkstra_page import DijkstraPage
+        dijkstra_page = DijkstraPage(self.stack)
+        self.stack.addWidget(dijkstra_page)
+        self.stack.setCurrentWidget(dijkstra_page)
+        
     def go_back(self):
-        # Find and switch to the home page in the stack
+        """Return to the home page"""
         for index in range(self.stack.count()):
             widget = self.stack.widget(index)
-            if widget.__class__.__name__ == "HomePage":  # Adjust if your home page has a different class name
+            if widget.__class__.__name__ == "HomePage":
                 self.stack.setCurrentWidget(widget)
                 break
+    
+    def go_to_astar(self):
+        from ui.astar_page import AStarPage
+        astar_page = AStarPage(self.stack)
+        self.stack.addWidget(astar_page)
+        self.stack.setCurrentWidget(astar_page)
