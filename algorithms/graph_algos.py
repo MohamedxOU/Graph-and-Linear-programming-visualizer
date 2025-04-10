@@ -45,7 +45,7 @@ def coloration_glouton(graphe):
         while couleur in couleurs_voisins:
             couleur += 1
         couleurs[sommet] = couleur
-
+ 
     return couleurs
 
 
@@ -73,7 +73,7 @@ def dijkstra(graph, start):
     
     return distances, previous_nodes
 
-def reconstruct_path(previous_nodes, start, end):
+def reconstruct_path_dk(previous_nodes, start, end):
     path = []
     current = end
     while current != start:
@@ -108,7 +108,7 @@ def a_star(graph, start, end, heuristic):
         open_set_hash.remove(current)
         
         if current == end:
-            return reconstruct_path(came_from, end)
+            return reconstruct_path_as(came_from, end)
             
         for neighbor, cost in graph[current].items():
             tentative_g_score = g_score[current] + cost
@@ -123,9 +123,11 @@ def a_star(graph, start, end, heuristic):
     
     return None  # No path found
 
-def reconstruct_path(came_from, current):
+def reconstruct_path_as(came_from, current):
     total_path = [current]
     while current in came_from:
         current = came_from[current]
         total_path.append(current)
     return total_path[::-1]
+
+

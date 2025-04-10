@@ -1,16 +1,24 @@
 import ast
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-                            QTextEdit, QLineEdit, QLabel, QMessageBox, QTabWidget,
-                            QTableWidget, QTableWidgetItem, QSpacerItem, QSizePolicy)
+import matplotlib
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import networkx as nx
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+    QTextEdit, QLineEdit, QLabel, QMessageBox, QTabWidget,
+    QTableWidget, QTableWidgetItem, QSpacerItem, QSizePolicy
+)
 from PyQt6.QtCore import Qt
 from algorithms.graph_algos import dfs
-from utils.graph_visualizer import afficher_graphe
 
 class DFSPage(QWidget):
     def __init__(self, stack):
         super().__init__()
         self.stack = stack
-        self.graph = {}  # Store the current graph
+        self.graph = {}
+        self.current_figure = None
+        self.animation = None
         self.init_ui()
 
     def init_ui(self):
@@ -102,7 +110,7 @@ class DFSPage(QWidget):
 
         self.setLayout(main_layout)
         
-        # Apply styling
+        # Apply styling (same as BFS page)
         self.setStyleSheet("""
             #titleLabel {
                 font-size: 20px;
@@ -110,18 +118,15 @@ class DFSPage(QWidget):
                 color: #81A1C1;
                 padding: 10px;
             }
-            
             #backButton {
                 background-color: #4C566A;
                 color: #D8DEE9;
                 border-radius: 5px;
                 padding: 5px 10px;
             }
-            
             #backButton:hover {
                 background-color: #5E81AC;
             }
-            
             QTextEdit, QLineEdit, QTableWidget {
                 background-color: #3B4252;
                 color: #ECEFF4;
@@ -129,12 +134,10 @@ class DFSPage(QWidget):
                 border-radius: 5px;
                 font-family: monospace;
             }
-            
             QTabWidget::pane {
                 border: 1px solid #4C566A;
                 border-radius: 5px;
             }
-            
             QTabBar::tab {
                 background-color: #3B4252;
                 color: #D8DEE9;
@@ -142,32 +145,27 @@ class DFSPage(QWidget):
                 border-top-left-radius: 5px;
                 border-top-right-radius: 5px;
             }
-            
             QTabBar::tab:selected {
                 background-color: #434C5E;
                 border-bottom: 2px solid #81A1C1;
             }
-            
             #runButton {
-                background-color: #A3BE8C;
+                background-color: #88C0D0;
                 color: #2E3440;
                 border-radius: 8px;
                 padding: 10px;
                 font-weight: bold;
                 font-size: 16px;
             }
-            
             #runButton:hover {
-                background-color: #B5D99C;
+                background-color: #8FBCBB;
             }
-            
             #addRowButton {
                 background-color: #5E81AC;
                 color: white;
                 border-radius: 5px;
                 padding: 5px;
             }
-            
             #resultLabel {
                 font-size: 16px;
                 padding: 15px;
@@ -238,13 +236,84 @@ class DFSPage(QWidget):
                 QMessageBox.warning(self, "Error", f"Starting node '{noeud_depart}' not in graph!")
                 return
             
-            resultat = dfs(graphe, noeud_depart)
-            self.label_result.setText(f"DFS Traversal:\n{' → '.join(resultat)}")
-            afficher_graphe(graphe, parcours=resultat, titre="DFS")
-
+            # Run DFS and get the traversal order
+            traversal_order = dfs(graphe, noeud_depart)
+            self.label_result.setText(f"DFS Traversal Order:\n{' → '.join(traversal_order)}")
+            
+            # Close previous visualization if exists
+            if self.current_figure:
+                plt.close(self.current_figure)
+            if self.animation and self.animation.event_source:
+                self.animation.event_source.stop()
+            
+            # Create visualization
+            self.current_figure, self.animation = self.dfs_visualizer(graphe, noeud_depart)
+            
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Input error: {str(e)}")
 
+    def dfs_visualizer(self, graph, start_node):
+        """Visualize DFS traversal with step-by-step animation"""
+        # Create the graph structure
+        G = nx.Graph()
+        for node, neighbors in graph.items():
+            for neighbor in neighbors:
+                G.add_edge(node, neighbor)
+        
+        pos = nx.spring_layout(G)
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        # Get DFS traversal order
+        traversal_order = dfs(graph, start_node)
+        
+        # Animation update function
+        def update(frame):
+            ax.clear()
+            current_node = traversal_order[frame]
+            
+            # Prepare node colors
+            node_colors = []
+            for node in G.nodes():
+                if node == current_node:
+                    node_colors.append('red')  # Current node
+                elif node in traversal_order[:frame]:
+                    # Visited nodes (blue gradient based on visit order)
+                    idx = traversal_order.index(node)
+                    shade = 0.3 + 0.7 * (idx / len(traversal_order))
+                    node_colors.append((0.0, 0.0, shade, 1.0))  # Blue gradient
+                else:
+                    node_colors.append('lightgray')  # Unvisited nodes
+            
+            # Prepare edge colors (highlight traversal path)
+            path_edges = []
+            for i in range(1, frame+1):
+                if traversal_order[i-1] in graph.get(traversal_order[i], []):
+                    path_edges.append((traversal_order[i-1], traversal_order[i]))
+                elif traversal_order[i] in graph.get(traversal_order[i-1], []):
+                    path_edges.append((traversal_order[i], traversal_order[i-1]))
+            
+            edge_colors = []
+            for edge in G.edges():
+                if edge in path_edges or tuple(reversed(edge)) in path_edges:
+                    edge_colors.append('red')
+                else:
+                    edge_colors.append('gray')
+            
+            # Draw the graph
+            nx.draw(G, pos, ax=ax, with_labels=True,
+                   node_color=node_colors, edge_color=edge_colors,
+                   width=2, node_size=800, font_size=12, font_weight='bold')
+            
+            ax.set_title(f"DFS Step {frame+1}/{len(traversal_order)}: Visiting {current_node}\n"
+                        f"Traversal: {' → '.join(traversal_order[:frame+1])}")
+        
+        # Create animation
+        ani = FuncAnimation(fig, update, frames=len(traversal_order),
+                          interval=1000, repeat=False)  # 1 second per step
+        
+        plt.show(block=False)
+        return fig, ani
+            
     def go_back(self):
         """Return to the graph menu"""
         for index in range(self.stack.count()):

@@ -1,26 +1,36 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QStackedWidget
+from PyQt6.QtWidgets import QApplication, QStackedWidget, QMainWindow
 from ui.home import HomePage
 
 def load_stylesheet():
     with open("styles/styles.css", "r") as f:
         return f.read()
 
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.stack = QStackedWidget()
+        self.setCentralWidget(self.stack)
+        
+        # Initialize pages
+        self.home_page = HomePage(self.stack)
+        self.stack.addWidget(self.home_page)
+        
+        # Window settings
+        self.setWindowTitle("Algorithm Visualizer")
+        self.setGeometry(100, 100, 1000, 800)
+
 def main():
     app = QApplication(sys.argv)
-    window_stack = QStackedWidget()
     
+    # Load stylesheet
     stylesheet = load_stylesheet()
     app.setStyleSheet(stylesheet)
-
-    home_page = HomePage(window_stack)
-    window_stack.addWidget(home_page)
-
-    window_stack.setCurrentWidget(home_page)
-    window_stack.setWindowTitle("Algorithm Selection")
-    window_stack.setGeometry(100, 100, 1000, 800)
-    window_stack.show()
-
+    
+    # Create and show main window
+    main_window = MainWindow()
+    main_window.show()
+    
     sys.exit(app.exec())
 
 if __name__ == "__main__":

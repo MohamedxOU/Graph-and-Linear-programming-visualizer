@@ -91,7 +91,7 @@ class GraphMenu(QWidget):
         bfs_page = BFSPage(self.stack)
         self.stack.addWidget(bfs_page)
         self.stack.setCurrentWidget(bfs_page)
-
+  
     def go_to_dfs(self):
         from ui.dfs_page import DFSPage
         dfs_page = DFSPage(self.stack)

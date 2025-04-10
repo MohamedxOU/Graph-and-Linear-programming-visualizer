@@ -1,21 +1,28 @@
 import ast
+import matplotlib
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import networkx as nx
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTextEdit, QLineEdit, QLabel, QMessageBox, QTabWidget,
     QTableWidget, QTableWidgetItem, QSpacerItem, QSizePolicy
 )
 from PyQt6.QtCore import Qt
-from algorithms.graph_algos import dijkstra, reconstruct_path
-from utils.graph_visualizer import afficher_graphe
+from algorithms.graph_algos import dijkstra, reconstruct_path_dk
+import heapq
 
 class DijkstraPage(QWidget):
     def __init__(self, stack):
         super().__init__()
         self.stack = stack
         self.graph = {}
+        self.current_figure = None
+        self.animation = None
         self.init_ui()
 
-    def init_ui(self):
+    def init_ui(self): 
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(15)
@@ -97,12 +104,85 @@ class DijkstraPage(QWidget):
         # Result display
         self.label_result = QLabel("Shortest path will appear here...")
         self.label_result.setWordWrap(True)
-        self.label_result.setStyleSheet(
-            "background-color: #f0f0f0; padding: 15px; border-radius: 5px;"
-        )
+        
         main_layout.addWidget(self.label_result)
 
         self.setLayout(main_layout)
+        
+        # Apply styling
+        self.setStyleSheet("""
+            #titleLabel {
+                font-size: 20px;
+                font-weight: bold;
+                color: #81A1C1;
+                padding: 10px;
+            }
+            
+            #backButton {
+                background-color: #4C566A;
+                color: #D8DEE9;
+                border-radius: 5px;
+                padding: 5px 10px;
+            }
+            
+            #backButton:hover {
+                background-color: #5E81AC;
+            }
+            
+            QTextEdit, QTableWidget {
+                background-color: #3B4252;
+                color: #ECEFF4;
+                border: 1px solid #4C566A;
+                border-radius: 5px;
+                font-family: monospace;
+            }
+            
+            QTabWidget::pane {
+                border: 1px solid #4C566A;
+                border-radius: 5px;
+            }
+            
+            QTabBar::tab {
+                background-color: #3B4252;
+                color: #D8DEE9;
+                padding: 8px;
+                border-top-left-radius: 5px;
+                border-top-right-radius: 5px;
+            }
+            
+            QTabBar::tab:selected {
+                background-color: #434C5E;
+                border-bottom: 2px solid #81A1C1;
+            }
+            
+            #runButton {
+                background-color: #D08770;
+                color: #2E3440;
+                border-radius: 8px;
+                padding: 10px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            
+            #runButton:hover {
+                background-color: #EBCB8B;
+            }
+            
+            #addRowButton {
+                background-color: #5E81AC;
+                color: white;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            
+            #resultLabel {
+                font-size: 16px;
+                padding: 15px;
+                background-color: #3B4252;
+                border-radius: 8px;
+                min-height: 60px;
+            }
+        """)
 
     def load_example_data(self):
         example_data = [
@@ -173,13 +253,20 @@ class DijkstraPage(QWidget):
                 QMessageBox.warning(self, "Error", "Start or end node not in graph!")
                 return
 
+            # Close previous visualization if exists
+            if self.current_figure:
+                plt.close(self.current_figure)
+            if self.animation and self.animation.event_source:
+                self.animation.event_source.stop()
+
+            # Run Dijkstra's algorithm
             distances, previous_nodes = dijkstra(graph, start)
             
             if distances[end] == float('inf'):
                 self.label_result.setText(f"No path exists from {start} to {end}!")
                 return
                 
-            path = reconstruct_path(previous_nodes, start, end)
+            path = reconstruct_path_dk(previous_nodes, start, end)
             total_distance = distances[end]
             
             result_text = f"Shortest path from {start} to {end}:\n"
@@ -188,17 +275,145 @@ class DijkstraPage(QWidget):
             
             self.label_result.setText(result_text)
             
-            # Visualize with highlighted path
-            afficher_graphe(
-                graph,
-                parcours=path,
-                titre=f"Dijkstra: {start} to {end} (Distance: {total_distance})",
-                weighted=True
-            )
-
+            # Create visualization
+            self.current_figure, self.animation = self.dijkstra_visualizer(graph, start, end, distances, previous_nodes)
+            
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Input error: {str(e)}")
 
+    def dijkstra_visualizer(self, graph, start, end, distances, previous_nodes):
+        """Visualize Dijkstra's algorithm with step-by-step animation"""
+        # Create the graph structure
+        G = nx.DiGraph() if nx.is_directed(nx.DiGraph(graph)) else nx.Graph()
+        for node, neighbors in graph.items():
+            for neighbor, weight in neighbors.items():
+                G.add_edge(node, neighbor, weight=weight)
+        
+        pos = nx.spring_layout(G)
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        # Reconstruct the exploration order
+        path = reconstruct_path_dk(previous_nodes, start, end)
+        visited_order = []
+        priority_queue = [(0, start)]
+        visited = set()
+        
+        # This will store the state at each step
+        steps = []
+        
+        while priority_queue:
+            current_distance, current_node = heapq.heappop(priority_queue)
+            
+            if current_node in visited:
+                continue
+                
+            visited.add(current_node)
+            visited_order.append(current_node)
+            steps.append((current_node, distances.copy(), previous_nodes.copy()))
+            
+            for neighbor, weight in graph.get(current_node, {}).items():
+                distance = current_distance + weight
+                if distance < distances[neighbor]:
+                    distances[neighbor] = distance
+                    previous_nodes[neighbor] = current_node
+                    heapq.heappush(priority_queue, (distance, neighbor))
+        
+        # Animation update function
+        def update(frame):
+            ax.clear()
+            
+            if frame < len(steps):
+                current_node, current_distances, current_previous = steps[frame]
+                
+                # Prepare node colors and labels
+                node_colors = []
+                node_labels = {}
+                for node in G.nodes():
+                    if node == current_node:
+                        node_colors.append('red')  # Current node
+                    elif node in visited_order[:frame]:
+                        node_colors.append('lightgreen')  # Visited nodes
+                    else:
+                        node_colors.append('lightgray')  # Unvisited nodes
+                    
+                    # Show distance on each node
+                    dist = current_distances.get(node, float('inf'))
+                    node_labels[node] = f"{node}\n({dist if dist != float('inf') else '∞'})"
+                
+                # Prepare edge colors
+                edge_colors = []
+                edge_labels = {}
+                for u, v, data in G.edges(data=True):
+                    if u == current_node and v in graph[current_node]:
+                        edge_colors.append('red')
+                    else:
+                        edge_colors.append('gray')
+                    edge_labels[(u, v)] = str(data['weight'])
+                
+                # Highlight the current best path
+                path_edges = []
+                for node in visited_order[:frame+1]:
+                    if current_previous[node] is not None:
+                        path_edges.append((current_previous[node], node))
+                
+                # Draw the graph
+                nx.draw_networkx_nodes(G, pos, ax=ax, node_color=node_colors, node_size=800)
+                nx.draw_networkx_labels(G, pos, ax=ax, labels=node_labels, font_size=10)
+                
+                # Draw all edges
+                nx.draw_networkx_edges(G, pos, ax=ax, edge_color=edge_colors, width=2)
+                
+                # Highlight path edges
+                nx.draw_networkx_edges(G, pos, ax=ax, edgelist=path_edges, 
+                                     edge_color='blue', width=3)
+                
+                # Draw edge labels
+                nx.draw_networkx_edge_labels(G, pos, ax=ax, edge_labels=edge_labels)
+                
+                ax.set_title(f"Step {frame+1}/{len(steps)}: Visiting {current_node}\n"
+                           f"Current distance to {end}: {current_distances.get(end, float('inf'))}")
+            else:
+                # Final state - show complete path
+                node_colors = []
+                node_labels = {}
+                for node in G.nodes():
+                    if node in path:
+                        node_colors.append('lightblue')
+                    elif node in visited_order:
+                        node_colors.append('lightgreen')
+                    else:
+                        node_colors.append('lightgray')
+                    
+                    dist = distances.get(node, float('inf'))
+                    node_labels[node] = f"{node}\n({dist if dist != float('inf') else '∞'})"
+                
+                # Draw the graph
+                nx.draw_networkx_nodes(G, pos, ax=ax, node_color=node_colors, node_size=800)
+                nx.draw_networkx_labels(G, pos, ax=ax, labels=node_labels, font_size=10)
+                
+                # Draw all edges
+                nx.draw_networkx_edges(G, pos, ax=ax, edge_color='gray', width=1)
+                
+                # Highlight path edges
+                path_edges = list(zip(path[:-1], path[1:]))
+                nx.draw_networkx_edges(G, pos, ax=ax, edgelist=path_edges, 
+                                     edge_color='blue', width=3)
+                
+                # Draw edge labels
+                edge_labels = {(u, v): str(d['weight']) for u, v, d in G.edges(data=True)}
+                nx.draw_networkx_edge_labels(G, pos, ax=ax, edge_labels=edge_labels)
+                
+                ax.set_title(f"Shortest path found!\n{start} to {end}: {distances[end]}")
+            
+            ax.axis('off')
+        
+        # Create animation
+        ani = FuncAnimation(fig, update, frames=len(steps)+1,
+                          interval=1500, repeat=False)  # 1.5 seconds per step
+        
+        plt.show(block=False)
+        return fig, ani
+            
     def go_back(self):
         """Return to the graph menu"""
         for index in range(self.stack.count()):

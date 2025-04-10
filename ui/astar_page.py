@@ -1,12 +1,17 @@
 import ast
+import matplotlib
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import networkx as nx
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTextEdit, QLineEdit, QLabel, QMessageBox, QTabWidget,
     QTableWidget, QTableWidgetItem, QSpacerItem, QSizePolicy
 )
 from PyQt6.QtCore import Qt
-from algorithms.graph_algos import a_star
-from utils.graph_visualizer import afficher_graphe
+from algorithms.graph_algos import a_star, reconstruct_path_as
+import heapq
 
 class AStarPage(QWidget):
     def __init__(self, stack):
@@ -14,6 +19,8 @@ class AStarPage(QWidget):
         self.stack = stack
         self.graph = {}
         self.heuristic = {}
+        self.current_figure = None
+        self.animation = None
         self.init_ui()
 
     def init_ui(self):
@@ -151,6 +158,9 @@ class AStarPage(QWidget):
 
     def run_astar(self):
         try:
+ 
+
+            # Get inputs
             graph = ast.literal_eval(self.entry_graph.toPlainText().strip())
             heuristic = ast.literal_eval(self.entry_heuristic.toPlainText().strip())
             start = self.entry_start.text().strip()
@@ -164,29 +174,183 @@ class AStarPage(QWidget):
                 QMessageBox.warning(self, "Error", "Start or end node not in graph!")
                 return
 
+            # Run A* algorithm
             path = a_star(graph, start, end, heuristic)
             
             if not path:
                 self.label_result.setText(f"No path found from {start} to {end}!")
                 return
+            
+            
+                        # Close previous visualization if exists
+            if self.current_figure:
+                plt.close(self.current_figure)
+            if self.animation and self.animation.event_source:
+                self.animation.event_source.stop()
+
                 
             total_cost = sum(graph[path[i]][path[i+1]] for i in range(len(path)-1))
             result_text = f"A* Path from {start} to {end}:\n"
             result_text += " → ".join(path) + "\n"
             result_text += f"Total cost: {total_cost}"
             
+            # Update result immediately
             self.label_result.setText(result_text)
-            afficher_graphe(
-                graph,
-                parcours=path,
-                titre=f"A*: {start} to {end} (Cost: {total_cost})",
-                weighted=True
+            
+            # Create visualization
+            self.current_figure, self.animation = self.astar_visualizer(
+                graph, heuristic, start, end, path
             )
+            
+            plt.show()  # <- Add this to ensure the figure window stays open
+
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Input error: {str(e)}")
 
+    def astar_visualizer(self, graph, heuristic, start, end, final_path):
+        """Visualize A* algorithm with step-by-step animation"""
+        # Create the graph structure
+        G = nx.DiGraph() if nx.is_directed(nx.DiGraph(graph)) else nx.Graph()
+        for node, neighbors in graph.items():
+            for neighbor, weight in neighbors.items():
+                G.add_edge(node, neighbor, weight=weight)
+        
+        pos = nx.spring_layout(G)
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        # Reconstruct the exploration steps
+        open_set = []
+        heapq.heappush(open_set, (heuristic[start], start))
+        came_from = {}
+        g_score = {node: float('inf') for node in graph}
+        g_score[start] = 0
+        f_score = {node: float('inf') for node in graph}
+        f_score[start] = heuristic[start]
+        open_set_hash = {start}
+        
+        steps = []
+        visited_order = []
+        
+        while open_set:
+            current_f, current = heapq.heappop(open_set)
+            open_set_hash.remove(current)
+            visited_order.append(current)
+            
+            # Save current state for animation
+            steps.append({
+                'current': current,
+                'open_set': open_set.copy(),
+                'came_from': came_from.copy(),
+                'g_score': g_score.copy(),
+                'f_score': f_score.copy()
+            })
+            
+            if current == end:
+                break
+                
+            for neighbor, cost in graph[current].items():
+                tentative_g_score = g_score[current] + cost
+                
+                if tentative_g_score < g_score[neighbor]:
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g_score
+                    f_score[neighbor] = tentative_g_score + heuristic[neighbor]
+                    if neighbor not in open_set_hash:
+                        heapq.heappush(open_set, (f_score[neighbor], neighbor))
+                        open_set_hash.add(neighbor)
+        
+        # Animation update function
+        def update(frame):
+            ax.clear()
+            
+            if frame < len(steps):
+                state = steps[frame]
+                current_node = state['current']
+                
+                # Prepare node colors and labels
+                node_colors = []
+                node_labels = {}
+                for node in G.nodes():
+                    if node == current_node:
+                        node_colors.append('red')  # Current node
+                    elif node in [n[1] for n in state['open_set']]:
+                        node_colors.append('lightyellow')  # In open set
+                    elif node in visited_order[:frame]:
+                        node_colors.append('lightgreen')  # Visited nodes
+                    else:
+                        node_colors.append('lightgray')  # Unvisited nodes
+                    
+                    # Show f-score and g-score on each node
+                    g = state['g_score'].get(node, float('inf'))
+                    f = state['f_score'].get(node, float('inf'))
+                    node_labels[node] = f"{node}\ng={g if g != float('inf') else '∞'}\nf={f if f != float('inf') else '∞'}"
+                
+                # Prepare edge colors
+                edge_colors = []
+                edge_labels = {}
+                for u, v, data in G.edges(data=True):
+                    if u == current_node and v in graph[current_node]:
+                        edge_colors.append('red')
+                    else:
+                        edge_colors.append('gray')
+                    edge_labels[(u, v)] = str(data['weight'])
+                
+                # Draw the graph
+                nx.draw_networkx_nodes(G, pos, ax=ax, node_color=node_colors, node_size=800)
+                nx.draw_networkx_labels(G, pos, ax=ax, labels=node_labels, font_size=8)
+                nx.draw_networkx_edges(G, pos, ax=ax, edge_color=edge_colors, width=2)
+                nx.draw_networkx_edge_labels(G, pos, ax=ax, edge_labels=edge_labels)
+                
+                ax.set_title(f"Step {frame+1}/{len(steps)}: Visiting {current_node}\n"
+                           f"Current f-score: {state['f_score'].get(current_node, float('inf'))}")
+            else:
+                # Final state - show complete path
+                node_colors = []
+                node_labels = {}
+                for node in G.nodes():
+                    if node in final_path:
+                        node_colors.append('lightblue')
+                    elif node in visited_order:
+                        node_colors.append('lightgreen')
+                    else:
+                        node_colors.append('lightgray')
+                    
+                    # Show final scores
+                    g = steps[-1]['g_score'].get(node, float('inf'))
+                    f = steps[-1]['f_score'].get(node, float('inf'))
+                    node_labels[node] = f"{node}\ng={g if g != float('inf') else '∞'}\nf={f if f != float('inf') else '∞'}"
+                
+                # Draw the graph
+                nx.draw_networkx_nodes(G, pos, ax=ax, node_color=node_colors, node_size=800)
+                nx.draw_networkx_labels(G, pos, ax=ax, labels=node_labels, font_size=8)
+                
+                # Draw all edges
+                nx.draw_networkx_edges(G, pos, ax=ax, edge_color='gray', width=1)
+                
+                # Highlight path edges
+                path_edges = list(zip(final_path[:-1], final_path[1:]))
+                nx.draw_networkx_edges(G, pos, ax=ax, edgelist=path_edges, 
+                                     edge_color='blue', width=3)
+                
+                # Draw edge labels
+                edge_labels = {(u, v): str(d['weight']) for u, v, d in G.edges(data=True)}
+                nx.draw_networkx_edge_labels(G, pos, ax=ax, edge_labels=edge_labels)
+                
+                total_cost = sum(graph[final_path[i]][final_path[i+1]] for i in range(len(final_path)-1))
+                ax.set_title(f"Path found!\n{start} to {end}: Cost = {total_cost}")
+            
+            ax.axis('off')
+        
+        # Create animation
+        ani = FuncAnimation(fig, update, frames=len(steps)+1,
+                          interval=1500, repeat=False)  # 1.5 seconds per step
+        
+        plt.show(block=False)
+        return fig, ani
+            
     def go_back(self):
+        """Return to the graph menu"""
         for index in range(self.stack.count()):
             widget = self.stack.widget(index)
             if widget.__class__.__name__ == "GraphMenu":

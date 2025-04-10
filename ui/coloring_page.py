@@ -1,16 +1,24 @@
 import ast
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-                            QTextEdit, QLabel, QMessageBox, QTabWidget,
-                            QTableWidget, QTableWidgetItem, QSpacerItem, QSizePolicy)
+import matplotlib
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import networkx as nx
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+    QTextEdit, QLabel, QMessageBox, QTabWidget,
+    QTableWidget, QTableWidgetItem, QSpacerItem, QSizePolicy
+)
 from PyQt6.QtCore import Qt
 from algorithms.graph_algos import coloration_glouton
-from utils.graph_visualizer import afficher_graphe
 
 class ColoringPage(QWidget):
     def __init__(self, stack):
         super().__init__()
         self.stack = stack
-        self.graph = {}  # Store the current graph
+        self.graph = {}
+        self.current_figure = None
+        self.animation = None
         self.init_ui()
 
     def init_ui(self):
@@ -219,17 +227,92 @@ class ColoringPage(QWidget):
                 QMessageBox.warning(self, "Error", "Graph cannot be empty!")
                 return
             
+            # Close previous visualization if exists
+            if self.current_figure:
+                plt.close(self.current_figure)
+            if self.animation and self.animation.event_source:
+                self.animation.event_source.stop()
+            
+            # Run coloring and get the result
             coloriage = coloration_glouton(graphe)
             result_text = "Coloring Result:\n"
             for node, color in coloriage.items():
                 result_text += f"Node {node}: Color {color}\n"
             
             self.label_result.setText(result_text)
-            afficher_graphe(graphe, coloriage=coloriage)
-
+            
+            # Create visualization
+            self.current_figure, self.animation = self.color_visualizer(graphe, coloriage)
+            
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Input error: {str(e)}")
 
+    def color_visualizer(self, graph, coloring):
+        """Visualize graph coloring with step-by-step animation"""
+        # Create the graph structure
+        G = nx.Graph()
+        for node, neighbors in graph.items():
+            for neighbor in neighbors:
+                G.add_edge(node, neighbor)
+        
+        pos = nx.spring_layout(G)
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        # Get nodes in the order they were colored
+        colored_order = list(coloring.keys())
+        color_values = list(coloring.values())
+        max_color = max(color_values) if color_values else 1
+        
+        # Create a colormap with enough distinct colors
+        cmap = plt.cm.get_cmap('tab20', max_color)
+        
+        # Animation update function
+        def update(frame):
+            ax.clear()
+            
+            # Prepare node colors
+            node_colors = []
+            node_labels = {}
+            current_node = colored_order[frame] if frame < len(colored_order) else None
+            
+            for node in G.nodes():
+                if node in colored_order[:frame+1]:
+                    color_idx = coloring[node] - 1  # Convert to 0-based index
+                    node_colors.append(cmap(color_idx/max_color))
+                    
+                    # Add label showing color number
+                    node_labels[node] = f"{node}\n(Color {coloring[node]})"
+                else:
+                    node_colors.append('lightgray')
+                    node_labels[node] = node
+                
+            # Highlight current node being colored
+            if current_node:
+                nx.draw_networkx_nodes(G, pos, nodelist=[current_node], 
+                                     node_color='red', ax=ax, node_size=1000)
+            
+            # Draw the graph
+            nx.draw(G, pos, ax=ax, with_labels=True, labels=node_labels,
+                   node_color=node_colors, edge_color='gray',
+                   width=2, font_size=10, font_weight='bold')
+            
+            # Add color information
+            info_text = f"Step {frame+1}/{len(colored_order)}: "
+            if current_node:
+                info_text += f"Coloring node {current_node} with color {coloring[current_node]}"
+            else:
+                info_text += "Coloring complete"
+            
+            ax.set_title(info_text)
+            ax.axis('off')
+        
+        # Create animation
+        ani = FuncAnimation(fig, update, frames=len(colored_order)+1,
+                          interval=1500, repeat=False)  # 1.5 seconds per step
+        
+        plt.show(block=False)
+        return fig, ani
+            
     def go_back(self):
         """Return to the graph menu"""
         for index in range(self.stack.count()):
