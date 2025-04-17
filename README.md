@@ -23,29 +23,6 @@ Algorithm Visualizer is a PyQt6-based desktop application designed to help users
   - Styled with a custom CSS theme for a clean and modern look.
 
 
-## Project Structure
-```
-.
-├── README.md               # Project documentation
-├── main.py                 # Entry point for the application
-├── algorithms/             # Directory containing algorithm implementations
-│   ├── bfs.py              # Breadth-First Search implementation
-│   ├── dfs.py              # Depth-First Search implementation
-│   ├── greedy_coloring.py  # Greedy Graph Coloring implementation
-│   └── simplex.py          # Simplex algorithm (planned)
-├── ui/                     # Directory for UI-related files
-│   ├── main_window.ui      # PyQt6 UI file for the main window
-│   ├── styles.css          # Custom CSS theme for styling
-│   └── components/         # Additional UI components
-├── data/                   # Directory for sample data and test cases
-│   ├── sample_graphs.json  # Sample graph data
-│   └── test_cases.json     # Test cases for algorithms
-├── utils/                  # Utility functions and helpers
-│   └── graph_utils.py      # Helper functions for graph operations
-├── requirements.txt        # Python dependencies
-└── LICENSE                 # License file
-```
-
 ## Installation
 
 1. Clone the repository:

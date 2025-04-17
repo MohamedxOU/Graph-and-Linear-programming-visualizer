@@ -95,7 +95,7 @@ class HomePage(QWidget):
         self.stack.setCurrentWidget(graph_menu)
 
     def go_to_lp_menu(self):
-        from ui.lp_menu import LPMenu  # type: ignore # Assuming you'll create this
+        from ui.pl_menu import LPMenu  # type: ignore # Assuming you'll create this
         lp_menu = LPMenu(self.stack)
         self.stack.addWidget(lp_menu)
-        self.stack.setCurrentWidget(lp_menu)
+        self.stack.setCurrentWidget(lp_menu) 
