@@ -2,5 +2,3 @@
 ui/__pycache__/
 algorithms/__pycache__/
 
-# Optionally ignore the virtual environment folder
-.venv/

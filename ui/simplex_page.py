@@ -1,9 +1,8 @@
 import numpy as np
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTextEdit, QLineEdit, QLabel, QMessageBox, QTabWidget,
-    QTableWidget, QTableWidgetItem, QSpacerItem, QSizePolicy,
-    QRadioButton
+    QTextEdit, QLineEdit, QLabel, QMessageBox,
+    QSpacerItem, QSizePolicy, QRadioButton, QFileDialog
 )
 from PyQt6.QtCore import Qt
 from algorithms.lp_algos.simplex import simplex
@@ -34,26 +33,32 @@ class SimplexPage(QWidget):
         title.setObjectName("titleLabel")
         main_layout.addWidget(title)
 
-        # Input tabs
-        self.tabs = QTabWidget()
+        # File import section
+        file_layout = QHBoxLayout()
+        self.btn_import = QPushButton("Import from Text File")
+        self.btn_import.clicked.connect(self.import_from_txt)
+        self.btn_import.setObjectName("importButton")
+        file_layout.addWidget(self.btn_import)
+        file_layout.addWidget(QLabel("OR enter manually below:"))
+        file_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+        main_layout.addLayout(file_layout)
         
-        # Standard form tab
-        std_tab = QWidget()
-        std_layout = QVBoxLayout()
-        
-        std_layout.addWidget(QLabel("Objective Function (comma-separated coefficients):"))
+        # Objective function input
+        main_layout.addWidget(QLabel("Objective Function (comma-separated coefficients):"))
         self.entry_objective = QLineEdit("3, 2")
-        std_layout.addWidget(self.entry_objective)
+        main_layout.addWidget(self.entry_objective)
         
-        std_layout.addWidget(QLabel("Constraints (one per line, format: 'a1,a2,... <= b'):"))
+        # Constraints input
+        main_layout.addWidget(QLabel("Constraints (one per line, format: 'a1,a2,... <= b'):"))
         self.entry_constraints = QTextEdit()
         self.entry_constraints.setPlainText(
             "1, 1 <= 4\n"
             "2, 1 <= 5\n"
             "-1, 2 <= 2"
         )
-        std_layout.addWidget(self.entry_constraints)
+        main_layout.addWidget(self.entry_constraints)
         
+        # Optimization type
         type_layout = QHBoxLayout()
         type_layout.addWidget(QLabel("Optimization:"))
         self.radio_max = QRadioButton("Maximize")
@@ -62,30 +67,7 @@ class SimplexPage(QWidget):
         type_layout.addWidget(self.radio_max)
         type_layout.addWidget(self.radio_min)
         type_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
-        std_layout.addLayout(type_layout)
-        
-        std_tab.setLayout(std_layout)
-        self.tabs.addTab(std_tab, "Standard Form")
-
-        # Tableau tab
-        tableau_tab = QWidget()
-        tableau_layout = QVBoxLayout()
-        tableau_layout.addWidget(QLabel("Enter initial tableau (one row per line):"))
-        
-        self.tableau_table = QTableWidget()
-        self.tableau_table.setColumnCount(4)
-        self.tableau_table.setHorizontalHeaderLabels(["x1", "x2", "s1", "Value"])
-        self.load_example_tableau()
-        tableau_layout.addWidget(self.tableau_table)
-        
-        btn_add_row = QPushButton("+ Add Constraint")
-        btn_add_row.clicked.connect(self.add_tableau_row)
-        btn_add_row.setObjectName("addRowButton")
-        tableau_layout.addWidget(btn_add_row)
-        
-        tableau_tab.setLayout(tableau_layout)
-        self.tabs.addTab(tableau_tab, "Tableau Input")
-        main_layout.addWidget(self.tabs)
+        main_layout.addLayout(type_layout)
 
         # Run button
         self.btn_run = QPushButton("Run Simplex Algorithm")
@@ -118,7 +100,7 @@ class SimplexPage(QWidget):
             #backButton:hover {
                 background-color: #5E81AC;
             }
-            QTextEdit, QLineEdit, QTableWidget {
+            QTextEdit, QLineEdit {
                 background-color: #3B4252;
                 color: #ECEFF4;
                 border: 1px solid #4C566A;
@@ -144,82 +126,114 @@ class SimplexPage(QWidget):
             #runButton:hover {
                 background-color: #B5D99C;
             }
-            #addRowButton {
-                background-color: #5E81AC;
+            #importButton {
+                background-color: #D08770;
                 color: white;
                 border-radius: 5px;
                 padding: 5px;
             }
+            #importButton:hover {
+                background-color: #EBCB8B;
+            }
         """)
 
-    def load_example_tableau(self):
-        example_data = [
-            ["3", "2", "0", "0"],
-            ["1", "1", "1", "4"],
-            ["2", "1", "0", "5"],
-            ["-1", "2", "0", "2"]
-        ]
-        self.tableau_table.setRowCount(len(example_data))
-        for row, items in enumerate(example_data):
-            for col, item in enumerate(items):
-                self.tableau_table.setItem(row, col, QTableWidgetItem(item))
-
-    def add_tableau_row(self):
-        row = self.tableau_table.rowCount()
-        self.tableau_table.insertRow(row)
-        for col in range(self.tableau_table.columnCount()):
-            self.tableau_table.setItem(row, col, QTableWidgetItem("0"))
+    def import_from_txt(self):
+        """Import LP problem from text file in standard form"""
+        try:
+            file_name, _ = QFileDialog.getOpenFileName(
+                self, 
+                "Import LP Problem", 
+                "", 
+                "Text Files (*.txt);;All Files (*)"
+            )
+            
+            if not file_name:
+                return
+                
+            with open(file_name, 'r') as file:
+                content = file.read()
+                
+            lines = [line.strip() for line in content.split('\n') if line.strip()]
+            
+            if len(lines) < 2:
+                QMessageBox.warning(self, "Import Error", "File must contain at least 2 lines (objective and constraints)")
+                return
+                
+            # Validate objective function
+            try:
+                objective = lines[0]
+                [float(x.strip()) for x in objective.split(",")]
+            except ValueError:
+                QMessageBox.warning(self, "Import Error", "First line must contain comma-separated numbers for objective function")
+                return
+                
+            # Validate constraints
+            valid_constraints = []
+            for i, line in enumerate(lines[1:]):
+                if "<=" not in line:
+                    QMessageBox.warning(self, "Import Error", f"Constraint {i+1} missing '<=' symbol")
+                    return
+                    
+                lhs, rhs = line.split("<=", 1)
+                try:
+                    coeffs = [float(x.strip()) for x in lhs.split(",")]
+                    float(rhs.strip())
+                    valid_constraints.append(line)
+                except ValueError:
+                    QMessageBox.warning(self, "Import Error", f"Invalid numbers in constraint {i+1}")
+                    return
+            
+            # Update UI if validation passed
+            self.entry_objective.setText(objective)
+            self.entry_constraints.setPlainText("\n".join(valid_constraints))
+            
+            QMessageBox.information(
+                self, 
+                "Import Successful", 
+                "LP problem imported successfully!\n\n"
+                f"Objective: {objective}\n"
+                f"Constraints: {len(valid_constraints)} loaded"
+            )
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self, 
+                "Import Error", 
+                f"An unexpected error occurred:\n\n{str(e)}"
+            )
 
     def parse_inputs(self):
-        if self.tabs.currentIndex() == 0:  # Standard form
-            try:
-                c = [float(x.strip()) for x in self.entry_objective.text().split(",")]
-                
-                constraints = []
-                for line in self.entry_constraints.toPlainText().split("\n"):
-                    if not line.strip():
-                        continue
-                    lhs, rhs = line.split("<=")
-                    constraints.append({
-                        'coeffs': [float(x.strip()) for x in lhs.split(",")],
-                        'rhs': float(rhs.strip())
-                    })
-                
-                A = [con['coeffs'] for con in constraints]
-                b = [con['rhs'] for con in constraints]
-                
-                if len(A) == 0 or len(b) == 0:
-                    raise ValueError("At least one constraint required")
-                if len(c) != len(A[0]):
-                    raise ValueError("Objective coefficients must match constraint variables")
-                
-                return c, A, b, self.radio_max.isChecked()
-                
-            except Exception as e:
-                QMessageBox.warning(self, "Input Error", f"Invalid input format: {str(e)}")
-                return None
-        else:  # Tableau input
-            try:
-                rows = self.tableau_table.rowCount()
-                cols = self.tableau_table.columnCount()
-                
-                tableau = []
-                for row in range(rows):
-                    row_data = []
-                    for col in range(cols):
-                        item = self.tableau_table.item(row, col)
-                        row_data.append(float(item.text()) if item and item.text() else 0.0)
-                    tableau.append(row_data)
-                
-                c = tableau[0][:-1]
-                A = [row[:-1] for row in tableau[1:]]
-                b = [row[-1] for row in tableau[1:]]
-                
-                return c, A, b, True
-                
-            except Exception as e:
-                QMessageBox.warning(self, "Input Error", f"Invalid tableau: {str(e)}")
-                return None
+        try:
+            c = [float(x.strip()) for x in self.entry_objective.text().split(",")]
+            
+            constraints = []
+            for line in self.entry_constraints.toPlainText().split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                if "<=" not in line:
+                    raise ValueError(f"Constraint missing '<=' symbol: {line}")
+                    
+                lhs, rhs = line.split("<=", 1)
+                constraints.append({
+                    'coeffs': [float(x.strip()) for x in lhs.split(",")],
+                    'rhs': float(rhs.strip())
+                })
+            
+            A = [con['coeffs'] for con in constraints]
+            b = [con['rhs'] for con in constraints]
+            
+            if len(A) == 0 or len(b) == 0:
+                raise ValueError("At least one constraint required")
+            if len(c) != len(A[0]):
+                raise ValueError(f"Objective has {len(c)} coefficients but constraints have {len(A[0])} variables")
+            
+            return c, A, b, self.radio_max.isChecked()
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Input Error", f"Invalid input format:\n\n{str(e)}")
+            return None
 
     def run_simplex(self):
         inputs = self.parse_inputs()
@@ -252,7 +266,7 @@ class SimplexPage(QWidget):
             self.result_area.setPlainText("\n".join(output))
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to run simplex: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Failed to run simplex:\n\n{str(e)}")
 
     def go_back(self):
         for index in range(self.stack.count()):

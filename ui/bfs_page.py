@@ -7,7 +7,7 @@ import networkx as nx
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTextEdit, QLineEdit, QLabel, QMessageBox, QTabWidget,
-    QTableWidget, QTableWidgetItem, QSpacerItem, QSizePolicy
+    QTableWidget, QTableWidgetItem, QSpacerItem, QSizePolicy, QFileDialog
 )
 from PyQt6.QtCore import Qt
 from algorithms.graph_algos import bfs
@@ -19,6 +19,7 @@ class BFSPage(QWidget):
         self.graph = {}
         self.current_figure = None
         self.animation = None
+        self.paused = False
         self.init_ui()
 
     def init_ui(self):
@@ -40,6 +41,16 @@ class BFSPage(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setObjectName("titleLabel")
         main_layout.addWidget(title)
+
+        # File import button
+        import_layout = QHBoxLayout()
+        self.btn_import = QPushButton("Import Graph from File")
+        self.btn_import.clicked.connect(self.import_from_file)
+        self.btn_import.setObjectName("importButton")
+        import_layout.addWidget(self.btn_import)
+        import_layout.addWidget(QLabel("OR enter manually below:"))
+        import_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+        main_layout.addLayout(import_layout)
 
         # Graph input tabs
         self.tabs = QTabWidget()
@@ -95,11 +106,25 @@ class BFSPage(QWidget):
         node_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         main_layout.addLayout(node_layout)
 
-        # Run button
+        # Control buttons
+        control_layout = QHBoxLayout()
         self.button_run_bfs = QPushButton("Run BFS Algorithm")
         self.button_run_bfs.clicked.connect(self.run_bfs)
         self.button_run_bfs.setObjectName("runButton")
-        main_layout.addWidget(self.button_run_bfs)
+        control_layout.addWidget(self.button_run_bfs)
+
+        self.button_pause = QPushButton("Pause")
+        self.button_pause.clicked.connect(self.toggle_pause)
+        self.button_pause.setObjectName("controlButton")
+        self.button_pause.setEnabled(False)
+        control_layout.addWidget(self.button_pause)
+
+        self.button_reset = QPushButton("Reset Layout")
+        self.button_reset.clicked.connect(self.reset_layout)
+        self.button_reset.setObjectName("controlButton")
+        self.button_reset.setEnabled(False)
+        control_layout.addWidget(self.button_reset)
+        main_layout.addLayout(control_layout)
 
         # Result display
         self.label_result = QLabel("BFS traversal will appear here...")
@@ -107,6 +132,8 @@ class BFSPage(QWidget):
         self.label_result.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label_result.setObjectName("resultLabel")
         main_layout.addWidget(self.label_result)
+
+        
 
         self.setLayout(main_layout)
         
@@ -166,12 +193,31 @@ class BFSPage(QWidget):
                 border-radius: 5px;
                 padding: 5px;
             }
+            #importButton {
+                background-color: #D08770;
+                color: white;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            #importButton:hover {
+                background-color: #EBCB8B;
+            }
             #resultLabel {
                 font-size: 16px;
                 padding: 15px;
                 background-color: #3B4252;
                 border-radius: 8px;
                 min-height: 60px;
+            }
+            
+            #controlButton {
+                background-color: #5E81AC;
+                color: white;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            #controlButton:hover {
+                background-color: #81A1C1;
             }
         """)
 
@@ -199,6 +245,53 @@ class BFSPage(QWidget):
         self.table.insertRow(row)
         self.table.setItem(row, 0, QTableWidgetItem(""))
         self.table.setItem(row, 1, QTableWidgetItem(""))
+
+    def import_from_file(self):
+        """Import graph from a text file in dictionary format"""
+        try:
+            file_name, _ = QFileDialog.getOpenFileName(
+                self,
+                "Import Graph Dictionary",
+                "",
+                "Text Files (*.txt);;All Files (*)"
+            )
+            
+            if not file_name:
+                return
+                
+            with open(file_name, 'r') as file:
+                content = file.read()
+                
+            # Validate the content is a proper dictionary
+            try:
+                graph_dict = ast.literal_eval(content)
+                if not isinstance(graph_dict, dict):
+                    raise ValueError("File content must be a dictionary")
+                    
+                # Update the dictionary input tab
+                self.entry_graphe.setPlainText(content)
+                self.tabs.setCurrentIndex(0)  # Switch to dictionary tab
+                
+                QMessageBox.information(
+                    self,
+                    "Import Successful",
+                    "Graph dictionary imported successfully!"
+                )
+            except Exception as e:
+                QMessageBox.warning(
+                    self,
+                    "Import Error",
+                    f"Invalid graph dictionary format:\n\n{str(e)}"
+                )
+                
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Import Error",
+                f"Failed to import file:\n\n{str(e)}"
+            )
+
+
 
     def get_graph_from_table(self):
         """Convert table data to graph dictionary"""
@@ -246,6 +339,11 @@ class BFSPage(QWidget):
             if self.animation and self.animation.event_source:
                 self.animation.event_source.stop()
 
+            # Reset pause state
+            self.paused = False
+            self.button_pause.setText("Pause")
+            self.button_pause.setEnabled(True)
+            self.button_reset.setEnabled(True)
             
             # Create visualization
             self.current_figure, self.animation = self.bfs_visualizer(graphe, noeud_depart)
@@ -253,22 +351,62 @@ class BFSPage(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Input error: {str(e)}")
 
+    def toggle_pause(self):
+        """Toggle animation pause state"""
+        if self.animation:
+            self.paused = not self.paused
+            if self.paused:
+                self.animation.event_source.stop()
+                self.button_pause.setText("Resume")
+            else:
+                self.animation.event_source.start()
+                self.button_pause.setText("Pause")
+
+    def reset_layout(self):
+        """Reset graph layout to default spring layout"""
+        if hasattr(self, 'pos') and self.current_figure:
+            # Recalculate positions using spring layout
+            G = nx.Graph()
+            if self.tabs.currentIndex() == 0:  # Dictionary tab
+                graphe = ast.literal_eval(self.entry_graphe.toPlainText().strip())
+            else:  # Table tab
+                graphe = self.get_graph_from_table()
+            
+            for node, neighbors in graphe.items():
+                for neighbor in neighbors:
+                    G.add_edge(node, neighbor)
+            
+            self.pos = nx.spring_layout(G)
+            
+            # Redraw with new positions
+            if hasattr(self, 'update'):
+                self.update(self.current_frame)
+                self.current_figure.canvas.draw_idle()
+
     def bfs_visualizer(self, graph, start_node):
-        """Visualize BFS traversal with step-by-step animation"""
+        """Visualize BFS traversal with step-by-step animation and draggable nodes"""
         # Create the graph structure
         G = nx.Graph()
         for node, neighbors in graph.items():
             for neighbor in neighbors:
                 G.add_edge(node, neighbor)
         
-        pos = nx.spring_layout(G)
+        # Store positions as instance variables for access in callbacks
+        self.pos = nx.spring_layout(G)
+        self.G = G
+        self.current_frame = 0
+        
         fig, ax = plt.subplots(figsize=(10, 8))
+        self.current_figure = fig
         
         # Get BFS traversal order
         traversal_order = bfs(graph, start_node)
         
-        # Animation update function
+        # Store animation reference
+        self.traversal_order = traversal_order
+        
         def update(frame):
+            self.current_frame = frame
             ax.clear()
             current_node = traversal_order[frame]
             
@@ -295,22 +433,65 @@ class BFSPage(QWidget):
                     edge_colors.append('gray')
             
             # Draw the graph
-            nx.draw(G, pos, ax=ax, with_labels=True,
+            nx.draw(G, self.pos, ax=ax, with_labels=True,
                    node_color=node_colors, edge_color=edge_colors,
                    width=2, node_size=800, font_size=12, font_weight='bold')
             
             ax.set_title(f"BFS Step {frame+1}/{len(traversal_order)}: Visiting {current_node}\n"
                         f"Traversal: {' → '.join(traversal_order[:frame+1])}")
         
+        # Store update function for reset
+        self.update = update
+        
+        # Mouse event handlers for dragging nodes
+        def on_press(event):
+            if event.inaxes != ax or self.paused == False:
+                return
+            
+            # Find if a node was clicked
+            for node in G.nodes():
+                x, y = self.pos[node]
+                if (x - event.xdata)**2 + (y - event.ydata)**2 < 0.01:  # Click radius
+                    self.selected_node = node
+                    self.offset = (x - event.xdata, y - event.ydata)
+                    break
+    
+        def on_motion(event):
+            if not hasattr(self, 'selected_node') or self.selected_node is None or event.inaxes != ax:
+                return
+            
+            # Update node position
+            self.pos[self.selected_node] = (event.xdata + self.offset[0], event.ydata + self.offset[1])
+            
+            # Redraw the current frame
+            update(self.current_frame)
+            fig.canvas.draw_idle()
+    
+        def on_release(event):
+            if hasattr(self, 'selected_node'):
+                self.selected_node = None
+        
+        # Connect the event handlers
+        fig.canvas.mpl_connect('button_press_event', on_press)
+        fig.canvas.mpl_connect('motion_notify_event', on_motion)
+        fig.canvas.mpl_connect('button_release_event', on_release)
+        
         # Create animation
         ani = FuncAnimation(fig, update, frames=len(traversal_order),
-                          interval=1000, repeat=False)  # 1 second per step
+                          interval=1000, repeat=False)
         
         plt.show(block=False)
         return fig, ani
             
     def go_back(self):
         """Return to the graph menu"""
+        # Clean up any existing plots
+        if self.current_figure:
+            plt.close(self.current_figure)
+        if self.animation and self.animation.event_source:
+            self.animation.event_source.stop()
+        
+        # Find and switch to graph menu
         for index in range(self.stack.count()):
             widget = self.stack.widget(index)
             if widget.__class__.__name__ == "GraphMenu":
