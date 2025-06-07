@@ -31,12 +31,44 @@ class GraphMenu(QWidget):
         self.btn_coloring.setObjectName("algorithmButton")
         button_layout.addWidget(self.btn_coloring)
         
+        #Welsh-Powell Coloring Algorithm
+        self.btn_welsh_powell = QPushButton("Welsh-Powell Coloring Algorithm")
+        self.btn_welsh_powell.clicked.connect(self.go_to_welsh_powell)
+        self.btn_welsh_powell.setObjectName("algorithmButton")
+        button_layout.addWidget(self.btn_welsh_powell)
+        
+        #prim algorithm
+        self.btn_prim = QPushButton("Prim's Algorithm")
+        self.btn_prim.clicked.connect(self.go_to_prim)  # Assuming this is a placeholder
+        self.btn_prim.setObjectName("algorithmButton")  # Added missing styling
+        button_layout.addWidget(self.btn_prim)  # Add to button_layout, not undefined 'layout'
+        
+        #kruskal algorithm
+        self.btn_kruskal = QPushButton("Kruskal's Algorithm")
+        self.btn_kruskal.clicked.connect(self.go_to_kruskal)
+        self.btn_kruskal.setObjectName("algorithmButton")  # Added missing styling
+        button_layout.addWidget(self.btn_kruskal)  # Add to button_layout, not undefined 'layout'
+        
+        #bellman-ford algorithm
+        self.btn_bellman_ford = QPushButton("Bellman-Ford Algorithm")
+        self.btn_bellman_ford.clicked.connect(self.go_to_bellman_ford)
+        self.btn_bellman_ford.setObjectName("algorithmButton")  # Added missing styling
+        button_layout.addWidget(self.btn_bellman_ford)  # Add to button_layout, not undefined 'layout'
+        
+        
+        # Dijkstra's Algorithm
         self.btn_dijkstra = QPushButton("Dijkstra's Algorithm")
         self.btn_dijkstra.clicked.connect(self.go_to_dijkstra)
         self.btn_dijkstra.setObjectName("algorithmButton")  # Added missing styling
         button_layout.addWidget(self.btn_dijkstra)  # Add to button_layout, not undefined 'layout'
         
+        #ford-fulkerson algorithm
+        self.btn_ford_fulkerson = QPushButton("Ford-Fulkerson Algorithm")
+        self.btn_ford_fulkerson.clicked.connect(self.go_to_ford_fulkerson)
+        self.btn_ford_fulkerson.setObjectName("algorithmButton")  # Added missing styling
+        button_layout.addWidget(self.btn_ford_fulkerson)  # Add to button_layout, not undefined 'layout'
         
+        # A* Algorithm
         self.btn_astar = QPushButton("A* Algorithm")
         self.btn_astar.clicked.connect(self.go_to_astar)
         self.btn_astar.setObjectName("algorithmButton")
@@ -104,6 +136,30 @@ class GraphMenu(QWidget):
         self.stack.addWidget(coloring_page)
         self.stack.setCurrentWidget(coloring_page)
         
+    def go_to_welsh_powell(self):
+        from ui.welsh_powell_page import WelshPowellPage
+        welsh_powell_page = WelshPowellPage(self.stack)
+        self.stack.addWidget(welsh_powell_page)
+        self.stack.setCurrentWidget(welsh_powell_page)
+        
+    def go_to_prim(self):
+        from ui.prim_page import PrimPage
+        prim_page = PrimPage(self.stack)
+        self.stack.addWidget(prim_page)
+        self.stack.setCurrentWidget(prim_page)
+        
+    def go_to_kruskal(self):
+        from ui.kruskal_page import KruskalPage
+        kruskal_page = KruskalPage(self.stack)
+        self.stack.addWidget(kruskal_page)
+        self.stack.setCurrentWidget(kruskal_page)
+        
+    def go_to_bellman_ford(self):
+        from ui.bellman_ford_page import BellmanFordPage
+        bellman_ford_page = BellmanFordPage(self.stack)
+        self.stack.addWidget(bellman_ford_page)
+        self.stack.setCurrentWidget(bellman_ford_page)
+        
     def go_to_dijkstra(self):
         from ui.dijkstra_page import DijkstraPage
         dijkstra_page = DijkstraPage(self.stack)
@@ -117,6 +173,12 @@ class GraphMenu(QWidget):
             if widget.__class__.__name__ == "HomePage":
                 self.stack.setCurrentWidget(widget)
                 break
+    
+    def go_to_ford_fulkerson(self):
+        from ui.ford_fulkerson_page import FordFulkersonPage
+        ford_fulkerson_page = FordFulkersonPage(self.stack)
+        self.stack.addWidget(ford_fulkerson_page)
+        self.stack.setCurrentWidget(ford_fulkerson_page)
     
     def go_to_astar(self):
         from ui.astar_page import AStarPage
