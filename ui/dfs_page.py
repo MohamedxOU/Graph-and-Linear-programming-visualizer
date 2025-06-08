@@ -7,7 +7,7 @@ import networkx as nx
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTextEdit, QLineEdit, QLabel, QMessageBox, QTabWidget,
-    QTableWidget, QTableWidgetItem, QSpacerItem, QSizePolicy, QFileDialog
+    QTableWidget, QTableWidgetItem, QSpacerItem, QSizePolicy, QFileDialog, QScrollArea
 )
 from PyQt6.QtCore import Qt
 from algorithms.graph_algos import dfs
@@ -115,12 +115,23 @@ class DFSPage(QWidget):
         self.button_run_dfs.setObjectName("runButton")
         main_layout.addWidget(self.button_run_dfs)
 
-        # Result display
+        # Result display with scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        result_container = QWidget()
+        result_layout = QVBoxLayout()
+        result_layout.setContentsMargins(0, 0, 0, 0)
+        result_layout.setSpacing(0)
         self.label_result = QLabel("DFS traversal will appear here...")
         self.label_result.setWordWrap(True)
-        self.label_result.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_result.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.label_result.setObjectName("resultLabel")
-        main_layout.addWidget(self.label_result)
+        result_layout.addWidget(self.label_result)
+        result_container.setLayout(result_layout)
+        scroll_area.setWidget(result_container)
+        scroll_area.setMinimumHeight(100)
+        scroll_area.setMaximumHeight(250)
+        main_layout.addWidget(scroll_area)
 
         self.setLayout(main_layout)
         
@@ -197,6 +208,8 @@ class DFSPage(QWidget):
                 min-height: 60px;
             }
         """)
+
+    # ...rest of the code remains unchanged...
 
     def load_example_data(self):
         """Load example data into the table"""

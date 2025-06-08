@@ -52,32 +52,24 @@ def coloration_glouton(graphe):
 
 " Algorithme Welsh-Powell "
 "  "
-
 def welsh_powell(graphe):
-    # Trier les sommets par degré décroissant
+    # Sort vertices by decreasing degree
     sommets_tries = sorted(graphe.keys(), key=lambda x: -len(graphe[x]))
-    
     couleurs = {}
     couleur_disponible = 1
-    
+
     while sommets_tries:
-        # Prendre le premier sommet non coloré
-        sommet = sommets_tries.pop(0)
-        couleurs[sommet] = couleur_disponible
-        
-        # Trouver tous les sommets non adjacents au sommet courant
-        non_adjacents = []
-        for s in sommets_tries:
-            if s not in graphe[sommet]:
-                non_adjacents.append(s)
-        
-        # Colorier tous les non adjacents avec la même couleur
-        for s in non_adjacents:
-            couleurs[s] = couleur_disponible
-            sommets_tries.remove(s)
-        
+        colored_this_round = []
+        for sommet in sommets_tries:
+            # Check if any neighbor already has this color
+            if all(couleurs.get(voisin) != couleur_disponible for voisin in graphe[sommet]):
+                couleurs[sommet] = couleur_disponible
+                colored_this_round.append(sommet)
+        # Remove colored nodes from the list
+        for sommet in colored_this_round:
+            sommets_tries.remove(sommet)
         couleur_disponible += 1
-    
+
     return couleurs
 
 
