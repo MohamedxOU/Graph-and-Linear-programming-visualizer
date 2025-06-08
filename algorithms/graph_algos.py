@@ -303,7 +303,7 @@ def ford_fulkerson(graph, source, sink):
     max_flow = 0
     
     # Augment the flow while there is path from source to sink
-    while bfs(residual, source, sink, parent):
+    while bfs_ff(residual, source, sink, parent):
         # Find minimum residual capacity of the path
         path_flow = float('inf')
         s = sink
@@ -329,7 +329,7 @@ def ford_fulkerson(graph, source, sink):
     
     return max_flow, flow_network
 
-def bfs(residual, source, sink, parent):
+def bfs_ff(residual, source, sink, parent):
     """BFS to find augmenting path in residual graph"""
     visited = {node: False for node in residual}
     queue = deque()

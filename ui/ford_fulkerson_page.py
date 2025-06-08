@@ -20,6 +20,8 @@ class FordFulkersonPage(QWidget):
         self.paused = False
         self.current_frame = 0
         self.selected_node = None
+        self._dragging_node = None
+        self._drag_offset = (0, 0)
         self.init_ui()
 
     def init_ui(self): 
@@ -351,7 +353,7 @@ class FordFulkersonPage(QWidget):
             self.cleanup_visualization()
 
     def draw_ff_result_plot(self, graph, source, sink, max_flow, flow_network):
-        """Draw only the final result plot (no animation)"""
+        """Draw only the final result plot (no animation) and allow node dragging."""
         try:
             self.cleanup_visualization()
             G = nx.DiGraph()
@@ -387,18 +389,51 @@ class FordFulkersonPage(QWidget):
                     edge_widths.append(1)
                 edge_labels[(u, v)] = f"{flow}/{graph[u][v]}"
 
-            nx.draw_networkx_nodes(G, self.pos, ax=ax, node_color=node_colors, node_size=800)
-            nx.draw_networkx_labels(G, self.pos, ax=ax, font_size=10)
-            nx.draw_networkx_edges(G, self.pos, ax=ax, edge_color=edge_colors, 
-                                   width=edge_widths, arrows=True, arrowstyle='->', arrowsize=15)
-            nx.draw_networkx_edge_labels(G, self.pos, ax=ax, edge_labels=edge_labels, font_size=8)
-            ax.set_title(f"Maximum Flow: {max_flow}\nFlow shown as flow/capacity", fontsize=12)
-            ax.axis('off')
+            def redraw():
+                ax.clear()
+                nx.draw_networkx_nodes(G, self.pos, ax=ax, node_color=node_colors, node_size=800)
+                nx.draw_networkx_labels(G, self.pos, ax=ax, font_size=10)
+                nx.draw_networkx_edges(G, self.pos, ax=ax, edge_color=edge_colors, 
+                                       width=edge_widths, arrows=True, arrowstyle='->', arrowsize=15)
+                nx.draw_networkx_edge_labels(G, self.pos, ax=ax, edge_labels=edge_labels, font_size=8)
+                ax.set_title(f"Maximum Flow: {max_flow}\nFlow shown as flow/capacity", fontsize=12)
+                ax.axis('off')
+                fig.canvas.draw_idle()
+
+            redraw()
+            self.enable_node_drag(fig, ax, redraw)
             fig.canvas.manager.set_window_title('Ford-Fulkerson Result')
             plt.show(block=False)
         except Exception as e:
             QMessageBox.critical(self, "Visualization Error", f"Failed to create result plot: {str(e)}")
             self.cleanup_visualization()
+
+    def enable_node_drag(self, fig, ax, redraw_func):
+        """Enable dragging of nodes in the matplotlib plot."""
+        self._dragging_node = None
+        self._drag_offset = (0, 0)
+
+        def on_press(event):
+            if event.inaxes != ax:
+                return
+            for node, (x, y) in self.pos.items():
+                if (x - event.xdata) ** 2 + (y - event.ydata) ** 2 < 0.02:
+                    self._dragging_node = node
+                    self._drag_offset = (x - event.xdata, y - event.ydata)
+                    break
+
+        def on_motion(event):
+            if self._dragging_node is None or event.inaxes != ax:
+                return
+            self.pos[self._dragging_node] = (event.xdata + self._drag_offset[0], event.ydata + self._drag_offset[1])
+            redraw_func()
+
+        def on_release(event):
+            self._dragging_node = None
+
+        fig.canvas.mpl_connect('button_press_event', on_press)
+        fig.canvas.mpl_connect('motion_notify_event', on_motion)
+        fig.canvas.mpl_connect('button_release_event', on_release)
 
     def cleanup_visualization(self):
         """Clean up any existing visualization resources"""

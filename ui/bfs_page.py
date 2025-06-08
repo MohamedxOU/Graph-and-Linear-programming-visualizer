@@ -1,6 +1,6 @@
 import ast
 import matplotlib
-matplotlib.use('Qt5Agg')  # Must be before other matplotlib imports
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import networkx as nx
@@ -20,6 +20,9 @@ class BFSPage(QWidget):
         self.current_figure = None
         self.animation = None
         self.paused = False
+        self.selected_node = None
+        self.offset = (0, 0)
+        self.current_frame = 0
         self.init_ui()
 
     def init_ui(self):
@@ -132,8 +135,6 @@ class BFSPage(QWidget):
         self.label_result.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label_result.setObjectName("resultLabel")
         main_layout.addWidget(self.label_result)
-
-        
 
         self.setLayout(main_layout)
         
@@ -291,8 +292,6 @@ class BFSPage(QWidget):
                 f"Failed to import file:\n\n{str(e)}"
             )
 
-
-
     def get_graph_from_table(self):
         """Convert table data to graph dictionary"""
         graph = {}
@@ -339,17 +338,82 @@ class BFSPage(QWidget):
             if self.animation and self.animation.event_source:
                 self.animation.event_source.stop()
 
-            # Reset pause state
-            self.paused = False
-            self.button_pause.setText("Pause")
-            self.button_pause.setEnabled(True)
-            self.button_reset.setEnabled(True)
-            
-            # Create visualization
-            self.current_figure, self.animation = self.bfs_visualizer(graphe, noeud_depart)
+            # Only animate if number of nodes < 15
+            if len(graphe) < 15:
+                self.paused = False
+                self.button_pause.setText("Pause")
+                self.button_pause.setEnabled(True)
+                self.button_reset.setEnabled(True)
+                self.current_figure, self.animation = self.bfs_visualizer(graphe, noeud_depart)
+            else:
+                self.button_pause.setEnabled(False)
+                self.button_reset.setEnabled(True)
+                self.current_figure = self.bfs_static_plot(graphe, noeud_depart)
+                self.animation = None
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Input error: {str(e)}")
+
+    def bfs_static_plot(self, graph, start_node):
+        """Show static BFS result with draggable nodes for large graphs"""
+        G = nx.Graph()
+        for node, neighbors in graph.items():
+            for neighbor in neighbors:
+                G.add_edge(node, neighbor)
+        self.pos = nx.spring_layout(G)
+        self.G = G
+        fig, ax = plt.subplots(figsize=(10, 8))
+        self.current_figure = fig
+
+        traversal_order = bfs(graph, start_node)
+        node_colors = []
+        for node in G.nodes():
+            if node == start_node:
+                node_colors.append('red')
+            elif node in traversal_order:
+                idx = traversal_order.index(node)
+                shade = 0.3 + 0.7 * (idx / len(traversal_order))
+                node_colors.append((0.0, shade, 0.0, 1.0))
+            else:
+                node_colors.append('lightgray')
+
+        nx.draw(G, self.pos, ax=ax, with_labels=True,
+                node_color=node_colors, edge_color='gray',
+                width=2, node_size=800, font_size=12, font_weight='bold')
+        ax.set_title(f"BFS Traversal: {' → '.join(traversal_order)}")
+
+        # Mouse event handlers for dragging nodes
+        def on_press(event):
+            if event.inaxes != ax:
+                return
+            for node in G.nodes():
+                x, y = self.pos[node]
+                if (x - event.xdata) ** 2 + (y - event.ydata) ** 2 < 0.01:
+                    self.selected_node = node
+                    self.offset = (x - event.xdata, y - event.ydata)
+                    break
+
+        def on_motion(event):
+            if not hasattr(self, 'selected_node') or self.selected_node is None or event.inaxes != ax:
+                return
+            self.pos[self.selected_node] = (event.xdata + self.offset[0], event.ydata + self.offset[1])
+            ax.clear()
+            nx.draw(G, self.pos, ax=ax, with_labels=True,
+                    node_color=node_colors, edge_color='gray',
+                    width=2, node_size=800, font_size=12, font_weight='bold')
+            ax.set_title(f"BFS Traversal: {' → '.join(traversal_order)}")
+            fig.canvas.draw_idle()
+
+        def on_release(event):
+            if hasattr(self, 'selected_node'):
+                self.selected_node = None
+
+        fig.canvas.mpl_connect('button_press_event', on_press)
+        fig.canvas.mpl_connect('motion_notify_event', on_motion)
+        fig.canvas.mpl_connect('button_release_event', on_release)
+
+        plt.show(block=False)
+        return fig
 
     def toggle_pause(self):
         """Toggle animation pause state"""
@@ -365,33 +429,46 @@ class BFSPage(QWidget):
     def reset_layout(self):
         """Reset graph layout to default spring layout"""
         if hasattr(self, 'pos') and self.current_figure:
-            # Recalculate positions using spring layout
             G = nx.Graph()
             if self.tabs.currentIndex() == 0:  # Dictionary tab
                 graphe = ast.literal_eval(self.entry_graphe.toPlainText().strip())
             else:  # Table tab
                 graphe = self.get_graph_from_table()
-            
             for node, neighbors in graphe.items():
                 for neighbor in neighbors:
                     G.add_edge(node, neighbor)
-            
             self.pos = nx.spring_layout(G)
-            
-            # Redraw with new positions
             if hasattr(self, 'update'):
                 self.update(self.current_frame)
+                self.current_figure.canvas.draw_idle()
+            else:
+                # For static plot
+                ax = self.current_figure.axes[0]
+                traversal_order = bfs(graphe, self.entry_noeud.text().strip())
+                node_colors = []
+                for node in G.nodes():
+                    if node == self.entry_noeud.text().strip():
+                        node_colors.append('red')
+                    elif node in traversal_order:
+                        idx = traversal_order.index(node)
+                        shade = 0.3 + 0.7 * (idx / len(traversal_order))
+                        node_colors.append((0.0, shade, 0.0, 1.0))
+                    else:
+                        node_colors.append('lightgray')
+                ax.clear()
+                nx.draw(G, self.pos, ax=ax, with_labels=True,
+                        node_color=node_colors, edge_color='gray',
+                        width=2, node_size=800, font_size=12, font_weight='bold')
+                ax.set_title(f"BFS Traversal: {' → '.join(traversal_order)}")
                 self.current_figure.canvas.draw_idle()
 
     def bfs_visualizer(self, graph, start_node):
         """Visualize BFS traversal with step-by-step animation and draggable nodes"""
-        # Create the graph structure
         G = nx.Graph()
         for node, neighbors in graph.items():
             for neighbor in neighbors:
                 G.add_edge(node, neighbor)
         
-        # Store positions as instance variables for access in callbacks
         self.pos = nx.spring_layout(G)
         self.G = G
         self.current_frame = 0
@@ -399,31 +476,25 @@ class BFSPage(QWidget):
         fig, ax = plt.subplots(figsize=(10, 8))
         self.current_figure = fig
         
-        # Get BFS traversal order
         traversal_order = bfs(graph, start_node)
-        
-        # Store animation reference
         self.traversal_order = traversal_order
-        
+
         def update(frame):
             self.current_frame = frame
             ax.clear()
             current_node = traversal_order[frame]
             
-            # Prepare node colors
             node_colors = []
             for node in G.nodes():
                 if node == current_node:
-                    node_colors.append('red')  # Current node
+                    node_colors.append('red')
                 elif node in traversal_order[:frame]:
-                    # Visited nodes (green gradient based on visit order)
                     idx = traversal_order.index(node)
                     shade = 0.3 + 0.7 * (idx / len(traversal_order))
                     node_colors.append((0.0, shade, 0.0, 1.0))
                 else:
-                    node_colors.append('lightgray')  # Unvisited nodes
+                    node_colors.append('lightgray')
             
-            # Prepare edge colors (highlight traversal path)
             path_edges = list(zip(traversal_order[:frame+1], traversal_order[1:frame+1]))
             edge_colors = []
             for edge in G.edges():
@@ -432,66 +503,52 @@ class BFSPage(QWidget):
                 else:
                     edge_colors.append('gray')
             
-            # Draw the graph
             nx.draw(G, self.pos, ax=ax, with_labels=True,
                    node_color=node_colors, edge_color=edge_colors,
                    width=2, node_size=800, font_size=12, font_weight='bold')
             
             ax.set_title(f"BFS Step {frame+1}/{len(traversal_order)}: Visiting {current_node}\n"
                         f"Traversal: {' → '.join(traversal_order[:frame+1])}")
-        
-        # Store update function for reset
+
         self.update = update
-        
-        # Mouse event handlers for dragging nodes
+
         def on_press(event):
-            if event.inaxes != ax or self.paused == False:
+            if event.inaxes != ax:
                 return
-            
-            # Find if a node was clicked
             for node in G.nodes():
                 x, y = self.pos[node]
-                if (x - event.xdata)**2 + (y - event.ydata)**2 < 0.01:  # Click radius
+                if (x - event.xdata)**2 + (y - event.ydata)**2 < 0.01:
                     self.selected_node = node
                     self.offset = (x - event.xdata, y - event.ydata)
                     break
-    
+
         def on_motion(event):
             if not hasattr(self, 'selected_node') or self.selected_node is None or event.inaxes != ax:
                 return
-            
-            # Update node position
             self.pos[self.selected_node] = (event.xdata + self.offset[0], event.ydata + self.offset[1])
-            
-            # Redraw the current frame
             update(self.current_frame)
             fig.canvas.draw_idle()
-    
+
         def on_release(event):
             if hasattr(self, 'selected_node'):
                 self.selected_node = None
-        
-        # Connect the event handlers
+
         fig.canvas.mpl_connect('button_press_event', on_press)
         fig.canvas.mpl_connect('motion_notify_event', on_motion)
         fig.canvas.mpl_connect('button_release_event', on_release)
         
-        # Create animation
         ani = FuncAnimation(fig, update, frames=len(traversal_order),
                           interval=1000, repeat=False)
         
         plt.show(block=False)
         return fig, ani
-            
+
     def go_back(self):
         """Return to the graph menu"""
-        # Clean up any existing plots
         if self.current_figure:
             plt.close(self.current_figure)
         if self.animation and self.animation.event_source:
             self.animation.event_source.stop()
-        
-        # Find and switch to graph menu
         for index in range(self.stack.count()):
             widget = self.stack.widget(index)
             if widget.__class__.__name__ == "GraphMenu":

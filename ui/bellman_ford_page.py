@@ -2,7 +2,6 @@ import ast
 import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 import networkx as nx
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
@@ -18,8 +17,9 @@ class BellmanFordPage(QWidget):
         self.stack = stack
         self.graph = {}
         self.current_figure = None
-        self.animation = None
-        self.paused = False
+        self.pos = None
+        self._dragging_node = None
+        self._drag_offset = (0, 0)
         self.init_ui()
 
     def init_ui(self): 
@@ -115,18 +115,6 @@ class BellmanFordPage(QWidget):
         self.btn_run.clicked.connect(self.run_bellman_ford)
         self.btn_run.setObjectName("runButton")
         control_layout.addWidget(self.btn_run)
-
-        self.btn_pause = QPushButton("Pause")
-        self.btn_pause.clicked.connect(self.toggle_pause)
-        self.btn_pause.setObjectName("controlButton")
-        self.btn_pause.setEnabled(False)
-        control_layout.addWidget(self.btn_pause)
-
-        self.btn_reset = QPushButton("Reset Layout")
-        self.btn_reset.clicked.connect(self.reset_layout)
-        self.btn_reset.setObjectName("controlButton")
-        self.btn_reset.setEnabled(False)
-        control_layout.addWidget(self.btn_reset)
         main_layout.addLayout(control_layout)
 
         # Scrollable result display
@@ -203,15 +191,6 @@ class BellmanFordPage(QWidget):
             }
             #importButton:hover {
                 background-color: #EBCB8B;
-            }
-            #controlButton {
-                background-color: #5E81AC;
-                color: white;
-                border-radius: 5px;
-                padding: 5px;
-            }
-            #controlButton:hover {
-                background-color: #81A1C1;
             }
             #resultDisplay {
                 font-family: monospace;
@@ -342,14 +321,6 @@ class BellmanFordPage(QWidget):
             # Close previous visualization if exists
             if self.current_figure:
                 plt.close(self.current_figure)
-            if self.animation and self.animation.event_source:
-                self.animation.event_source.stop()
-
-            # Reset pause state
-            self.paused = False
-            self.btn_pause.setText("Pause")
-            self.btn_pause.setEnabled(True)
-            self.btn_reset.setEnabled(True)
 
             # Run Bellman-Ford algorithm
             distances, predecessors = bellman_ford(graph, start)
@@ -375,268 +346,104 @@ class BellmanFordPage(QWidget):
             self.result_display.setPlainText(result_text)
             self.result_display.ensureCursorVisible()  # Auto-scroll to bottom
             
-            # Create visualization
-            self.current_figure, self.animation = self.bellman_ford_visualizer(graph, start, end, distances, predecessors)
+            # Show only the final result plot
+            self.draw_bf_result_plot(graph, start, end, distances, predecessors)
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Input error: {str(e)}")
             self.result_display.setPlainText(f"Error: {str(e)}")
 
-    def toggle_pause(self):
-        """Toggle animation pause state"""
-        if self.animation:
-            self.paused = not self.paused
-            if self.paused:
-                self.animation.event_source.stop()
-                self.btn_pause.setText("Resume")
-            else:
-                self.animation.event_source.start()
-                self.btn_pause.setText("Pause")
-
-    def reset_layout(self):
-        """Reset graph layout to default spring layout"""
-        if hasattr(self, 'pos') and self.current_figure:
-            # Recalculate positions using spring layout
-            G = nx.DiGraph() if nx.is_directed(nx.DiGraph(self.graph)) else nx.Graph()
-            if self.tabs.currentIndex() == 0:  # Dictionary tab
-                graph = ast.literal_eval(self.entry_graph.toPlainText().strip())
-            else:  # Table tab
-                graph = self.get_graph_from_table()
-            
-            for node, neighbors in graph.items():
-                for neighbor in neighbors:
-                    G.add_edge(node, neighbor)
-            
-            self.pos = nx.spring_layout(G)
-            
-            # Redraw with new positions
-            if hasattr(self, 'update'):
-                self.update(self.current_frame)
-                self.current_figure.canvas.draw_idle()
-
-    def bellman_ford_visualizer(self, graph, start, end, distances, predecessors):
-        """Visualize Bellman-Ford algorithm with step-by-step animation"""
-        G = nx.DiGraph() if nx.is_directed(nx.DiGraph(graph)) else nx.Graph()
-        for node, neighbors in graph.items():
-            for neighbor, weight in neighbors.items():
-                G.add_edge(node, neighbor, weight=weight)
-        
-        # Store positions as instance variables for access in callbacks
-        self.pos = nx.spring_layout(G)
-        self.G = G
-        self.current_frame = 0
-        
-        fig, ax = plt.subplots(figsize=(10, 8))
-        self.current_figure = fig
-        
-        # Reconstruct the steps of Bellman-Ford
-        steps = []
-        current_distances = {node: float('inf') for node in graph}
-        current_distances[start] = 0
-        current_predecessors = {node: None for node in graph}
-        
-        # For visualization, we'll track each relaxation
-        for i in range(len(graph) - 1):
-            updated = False
+    def draw_bf_result_plot(self, graph, start, end, distances, predecessors):
+        """Draw only the final result plot (no animation), with draggable nodes."""
+        try:
+            if self.current_figure:
+                plt.close(self.current_figure)
+            G = nx.DiGraph()
             for u in graph:
-                for v, weight in graph[u].items():
-                    if current_distances[u] + weight < current_distances[v]:
-                        old_dist = current_distances[v]
-                        current_distances[v] = current_distances[u] + weight
-                        current_predecessors[v] = u
-                        steps.append((i+1, u, v, weight, current_distances.copy(), current_predecessors.copy(), old_dist))
-                        updated = True
-            
-            if not updated:
-                break
-        
-        # Check for negative cycles (visualization step)
-        has_negative_cycle = False
-        for u in graph:
-            for v, weight in graph[u].items():
-                if current_distances[u] + weight < current_distances[v]:
-                    steps.append((-1, u, v, weight, None, None, None))  # Special frame for cycle detection
-                    has_negative_cycle = True
-                    break
-            if has_negative_cycle:
-                break
-        
-        # Animation update function
-        def update(frame):
-            self.current_frame = frame
-            ax.clear()
-            
-            if frame < len(steps):
-                iteration, u, v, weight, current_dists, current_preds, old_dist = steps[frame]
-                
-                if iteration == -1:  # Negative cycle frame
-                    # Draw the graph with cycle highlighted
-                    node_colors = ['lightgray' for _ in G.nodes()]
-                    edge_colors = ['gray' for _ in G.edges()]
-                    
-                    # Highlight the problematic edge
-                    for i, edge in enumerate(G.edges()):
-                        if edge == (u, v):
-                            edge_colors[i] = 'red'
-                    
-                    nx.draw_networkx_nodes(G, self.pos, ax=ax, node_color=node_colors, node_size=800)
-                    nx.draw_networkx_labels(G, self.pos, ax=ax, font_size=10)
-                    nx.draw_networkx_edges(G, self.pos, ax=ax, edge_color=edge_colors, width=2)
-                    
-                    # Draw edge labels
-                    edge_labels = {(u, v): str(d['weight']) for u, v, d in G.edges(data=True)}
-                    nx.draw_networkx_edge_labels(G, self.pos, ax=ax, edge_labels=edge_labels)
-                    
-                    ax.set_title("Negative cycle detected!\n"
-                               f"Edge {u}→{v} (weight: {weight}) creates negative cycle")
-                else:
-                    # Prepare node colors
-                    node_colors = []
-                    for node in G.nodes():
-                        if node == u or node == v:
-                            node_colors.append('red')  # Current nodes being processed
-                        elif current_dists[node] != float('inf'):
-                            node_colors.append('lightgreen')  # Nodes with known distances
-                        else:
-                            node_colors.append('lightgray')  # Unprocessed nodes
-                    
-                    # Prepare edge colors and widths
-                    edge_colors = []
-                    edge_widths = []
-                    for edge in G.edges():
-                        if edge == (u, v):
-                            edge_colors.append('red')
-                            edge_widths.append(3)
-                        else:
-                            edge_colors.append('gray')
-                            edge_widths.append(1)
-                    
-                    # Draw the graph
-                    nx.draw_networkx_nodes(G, self.pos, ax=ax, node_color=node_colors, node_size=800)
-                    nx.draw_networkx_labels(G, self.pos, ax=ax, font_size=10)
-                    nx.draw_networkx_edges(G, self.pos, ax=ax, edge_color=edge_colors, width=edge_widths)
-                    
-                    # Draw edge labels
-                    edge_labels = {(u, v): str(d['weight']) for u, v, d in G.edges(data=True)}
-                    nx.draw_networkx_edge_labels(G, self.pos, ax=ax, edge_labels=edge_labels)
-                    
-                    # Display distance updates
-                    dist_text = f"Updated {v}'s distance:\n"
-                    dist_text += f"Old: {old_dist if old_dist != float('inf') else '∞'}\n"
-                    dist_text += f"New: {current_dists[v]}\n"
-                    dist_text += f"Via: {u} (distance {current_dists[u]})"
-                    
-                    ax.set_title(f"Iteration {iteration}: Relaxing edge {u}→{v} (weight: {weight})\n{dist_text}")
+                for v in graph[u]:
+                    G.add_edge(u, v, weight=graph[u][v])
+            self.G = G
+            self.pos = nx.spring_layout(G)
+            fig, ax = plt.subplots(figsize=(10, 8), tight_layout=True)
+            self.current_figure = fig
+
+            # Highlight the shortest path if it exists
+            path = reconstruct_path_bf(predecessors, start, end)
+            self._draw_graph(ax, G, self.pos, start, end, path, distances)
+            self.enable_node_drag(fig, ax, G, start, end, path, distances)
+
+            fig.canvas.manager.set_window_title('Bellman-Ford Result')
+            plt.show(block=False)
+        except Exception as e:
+            QMessageBox.critical(self, "Visualization Error", f"Failed to create result plot: {str(e)}")
+
+    def _draw_graph(self, ax, G, pos, start, end, path, distances):
+        path_edges = list(zip(path[:-1], path[1:])) if path else []
+        node_colors = []
+        for node in G.nodes():
+            if node == start:
+                node_colors.append('green')
+            elif node == end:
+                node_colors.append('red')
+            elif path and node in path:
+                node_colors.append('lightblue')
             else:
-                # Final state - show complete results
-                if has_negative_cycle:
-                    node_colors = ['lightgray' for _ in G.nodes()]
-                    edge_colors = ['gray' for _ in G.edges()]
-                    
-                    nx.draw_networkx_nodes(G, self.pos, ax=ax, node_color=node_colors, node_size=800)
-                    nx.draw_networkx_labels(G, self.pos, ax=ax, font_size=10)
-                    nx.draw_networkx_edges(G, self.pos, ax=ax, edge_color=edge_colors, width=2)
-                    
-                    # Draw edge labels
-                    edge_labels = {(u, v): str(d['weight']) for u, v, d in G.edges(data=True)}
-                    nx.draw_networkx_edge_labels(G, self.pos, ax=ax, edge_labels=edge_labels)
-                    
-                    ax.set_title("Negative weight cycle detected!\nNo shortest paths exist")
-                else:
-                    # Highlight the shortest path
-                    path = reconstruct_path_bf(predecessors, start, end)
-                    path_edges = list(zip(path[:-1], path[1:]))
-                    
-                    # Prepare node colors
-                    node_colors = []
-                    for node in G.nodes():
-                        if node == start:
-                            node_colors.append('green')  # Start node
-                        elif node == end:
-                            node_colors.append('red')  # End node
-                        elif node in path:
-                            node_colors.append('lightblue')  # Path nodes
-                        else:
-                            node_colors.append('lightgray')  # Other nodes
-                    
-                    # Prepare edge colors and widths
-                    edge_colors = []
-                    edge_widths = []
-                    for edge in G.edges():
-                        if edge in path_edges:
-                            edge_colors.append('blue')
-                            edge_widths.append(3)
-                        else:
-                            edge_colors.append('gray')
-                            edge_widths.append(1)
-                    
-                    # Draw the graph
-                    nx.draw_networkx_nodes(G, self.pos, ax=ax, node_color=node_colors, node_size=800)
-                    nx.draw_networkx_labels(G, self.pos, ax=ax, font_size=10)
-                    nx.draw_networkx_edges(G, self.pos, ax=ax, edge_color=edge_colors, width=edge_widths)
-                    
-                    # Draw edge labels
-                    edge_labels = {(u, v): str(d['weight']) for u, v, d in G.edges(data=True)}
-                    nx.draw_networkx_edge_labels(G, self.pos, ax=ax, edge_labels=edge_labels)
-                    
-                    # Display distances
-                    dist_text = f"Shortest path from {start} to {end}: {distances[end]}\n"
-                    dist_text += f"Path: {' → '.join(path)}"
-                    
-                    ax.set_title(f"Bellman-Ford Complete!\n{dist_text}")
-            
-            ax.axis('off')
-        
-        # Store update function for reset
-        self.update = update
-        
-        # Mouse event handlers for dragging nodes
+                node_colors.append('lightgray')
+        edge_colors = []
+        edge_widths = []
+        for u, v in G.edges():
+            if (u, v) in path_edges:
+                edge_colors.append('blue')
+                edge_widths.append(3)
+            else:
+                edge_colors.append('gray')
+                edge_widths.append(1)
+        edge_labels = {(u, v): str(G[u][v]['weight']) for u, v in G.edges()}
+        ax.clear()
+        nx.draw_networkx_nodes(G, pos, ax=ax, node_color=node_colors, node_size=800)
+        nx.draw_networkx_labels(G, pos, ax=ax, font_size=10)
+        nx.draw_networkx_edges(G, pos, ax=ax, edge_color=edge_colors, 
+                               width=edge_widths, arrows=True, arrowstyle='->', arrowsize=15)
+        nx.draw_networkx_edge_labels(G, pos, ax=ax, edge_labels=edge_labels, font_size=8)
+        if path:
+            ax.set_title(f"Shortest path from {start} to {end}: {' → '.join(path)}\nTotal distance: {distances[end]}", fontsize=12)
+        else:
+            ax.set_title("No path exists or negative cycle detected.", fontsize=12)
+        ax.axis('off')
+
+    def enable_node_drag(self, fig, ax, G, start, end, path, distances):
+        """Enable dragging of nodes in the matplotlib plot."""
+        self._dragging_node = None
+        self._drag_offset = (0, 0)
+
         def on_press(event):
-            if event.inaxes != ax or not self.paused:
+            if event.inaxes != ax:
                 return
-            
-            # Find if a node was clicked
-            for node in G.nodes():
-                x, y = self.pos[node]
-                if (x - event.xdata)**2 + (y - event.ydata)**2 < 0.01:  # Click radius
-                    self.selected_node = node
-                    self.offset = (x - event.xdata, y - event.ydata)
+            for node, (x, y) in self.pos.items():
+                if (x - event.xdata) ** 2 + (y - event.ydata) ** 2 < 0.02:
+                    self._dragging_node = node
+                    self._drag_offset = (x - event.xdata, y - event.ydata)
                     break
-    
+
         def on_motion(event):
-            if not hasattr(self, 'selected_node') or self.selected_node is None or event.inaxes != ax:
+            if self._dragging_node is None or event.inaxes != ax:
                 return
-            
-            # Update node position
-            self.pos[self.selected_node] = (event.xdata + self.offset[0], event.ydata + self.offset[1])
-            
-            # Redraw the current frame
-            update(self.current_frame)
+            self.pos[self._dragging_node] = (event.xdata + self._drag_offset[0], event.ydata + self._drag_offset[1])
+            self._draw_graph(ax, G, self.pos, start, end, path, distances)
             fig.canvas.draw_idle()
-    
+
         def on_release(event):
-            if hasattr(self, 'selected_node'):
-                self.selected_node = None
-        
-        # Connect the event handlers
+            self._dragging_node = None
+
         fig.canvas.mpl_connect('button_press_event', on_press)
         fig.canvas.mpl_connect('motion_notify_event', on_motion)
         fig.canvas.mpl_connect('button_release_event', on_release)
-        
-        # Create animation
-        ani = FuncAnimation(fig, update, frames=len(steps)+1,
-                          interval=1500, repeat=False)  # 1.5 seconds per step
-        
-        plt.show(block=False)
-        return fig, ani
-            
+
     def go_back(self):
         """Return to the graph menu"""
         # Clean up any existing plots
         if self.current_figure:
             plt.close(self.current_figure)
-        if self.animation and self.animation.event_source:
-            self.animation.event_source.stop()
         
         # Find and switch to graph menu
         for index in range(self.stack.count()):
