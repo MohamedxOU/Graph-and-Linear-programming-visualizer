@@ -1,5 +1,6 @@
 import sys
 from PyQt6.QtWidgets import QApplication, QStackedWidget, QMainWindow
+
 from ui.home import HomePage
 
 def load_stylesheet():
@@ -20,7 +21,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Algorithm Visualizer")
         self.setGeometry(100, 100, 1000, 800)
 
-def main():
+def main(): 
     app = QApplication(sys.argv)
     
     # Load stylesheet

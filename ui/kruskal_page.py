@@ -20,6 +20,9 @@ class KruskalPage(QWidget):
         self.current_figure = None
         self.animation = None
         self.paused = False
+        self.selected_node = None
+        self.offset = (0, 0)
+        self.current_frame = 0
         self.init_ui()
 
     def init_ui(self): 
@@ -363,12 +366,94 @@ class KruskalPage(QWidget):
             self.result_display.setPlainText(result_text)
             self.result_display.ensureCursorVisible()  # Auto-scroll to bottom
             
-            # Create visualization
-            self.current_figure, self.animation = self.kruskal_visualizer(graph, mst)
-            
+            # Visualization: animate if < 15 nodes, else static
+            if len(graph) < 15:
+                self.current_figure, self.animation = self.kruskal_visualizer(graph, mst)
+            else:
+                self.btn_pause.setEnabled(False)
+                self.current_figure = self.kruskal_static_plot(graph, mst)
+                self.animation = None
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Input error: {str(e)}")
             self.result_display.setPlainText(f"Error: {str(e)}")
+
+    def kruskal_static_plot(self, graph, mst):
+        """Show static MST result with draggable nodes for large graphs"""
+        G = nx.Graph()
+        for node, neighbors in graph.items():
+            for neighbor, weight in neighbors.items():
+                G.add_edge(node, neighbor, weight=weight)
+        self.pos = nx.spring_layout(G)
+        self.G = G
+        fig, ax = plt.subplots(figsize=(10, 8))
+        self.current_figure = fig
+
+        # Prepare MST edges
+        mst_edges = set()
+        for u in mst:
+            for v in mst[u]:
+                mst_edges.add((u, v))
+                mst_edges.add((v, u))
+
+        # Node colors
+        node_colors = []
+        for node in G.nodes():
+            node_colors.append('lightgreen' if node in mst else 'lightgray')
+
+        # Edge colors and widths
+        edge_colors = []
+        edge_widths = []
+        for edge in G.edges():
+            if edge in mst_edges or (edge[1], edge[0]) in mst_edges:
+                edge_colors.append('blue')
+                edge_widths.append(3)
+            else:
+                edge_colors.append('gray')
+                edge_widths.append(1)
+
+        nx.draw_networkx_nodes(G, self.pos, ax=ax, node_color=node_colors, node_size=800)
+        nx.draw_networkx_labels(G, self.pos, ax=ax, font_size=10)
+        nx.draw_networkx_edges(G, self.pos, ax=ax, edge_color=edge_colors, width=edge_widths)
+        edge_labels = {(u, v): str(d['weight']) for u, v, d in G.edges(data=True)}
+        nx.draw_networkx_edge_labels(G, self.pos, ax=ax, edge_labels=edge_labels)
+        ax.set_title("Minimum Spanning Tree (static view)")
+        ax.axis('off')
+
+        # Mouse event handlers for dragging nodes
+        def on_press(event):
+            if event.inaxes != ax:
+                return
+            for node in G.nodes():
+                x, y = self.pos[node]
+                if (x - event.xdata) ** 2 + (y - event.ydata) ** 2 < 0.01:
+                    self.selected_node = node
+                    self.offset = (x - event.xdata, y - event.ydata)
+                    break
+
+        def on_motion(event):
+            if not hasattr(self, 'selected_node') or self.selected_node is None or event.inaxes != ax:
+                return
+            self.pos[self.selected_node] = (event.xdata + self.offset[0], event.ydata + self.offset[1])
+            ax.clear()
+            nx.draw_networkx_nodes(G, self.pos, ax=ax, node_color=node_colors, node_size=800)
+            nx.draw_networkx_labels(G, self.pos, ax=ax, font_size=10)
+            nx.draw_networkx_edges(G, self.pos, ax=ax, edge_color=edge_colors, width=edge_widths)
+            nx.draw_networkx_edge_labels(G, self.pos, ax=ax, edge_labels=edge_labels)
+            ax.set_title("Minimum Spanning Tree (static view)")
+            ax.axis('off')
+            fig.canvas.draw_idle()
+
+        def on_release(event):
+            if hasattr(self, 'selected_node'):
+                self.selected_node = None
+
+        fig.canvas.mpl_connect('button_press_event', on_press)
+        fig.canvas.mpl_connect('motion_notify_event', on_motion)
+        fig.canvas.mpl_connect('button_release_event', on_release)
+
+        plt.show(block=False)
+        return fig
 
     def toggle_pause(self):
         """Toggle animation pause state"""
@@ -384,32 +469,40 @@ class KruskalPage(QWidget):
     def reset_layout(self):
         """Reset graph layout to default spring layout"""
         if hasattr(self, 'pos') and self.current_figure:
-            # Recalculate positions using spring layout
             G = nx.Graph()
             if self.tabs.currentIndex() == 0:  # Dictionary tab
                 graph = ast.literal_eval(self.entry_graph.toPlainText().strip())
             else:  # Table tab
                 graph = self.get_graph_from_table()
-            
             for node, neighbors in graph.items():
                 for neighbor in neighbors:
                     G.add_edge(node, neighbor)
-            
             self.pos = nx.spring_layout(G)
-            
-            # Redraw with new positions
             if hasattr(self, 'update'):
                 self.update(self.current_frame)
                 self.current_figure.canvas.draw_idle()
+            else:
+                ax = self.current_figure.axes[0]
+                node_colors = ['lightgreen' for _ in G.nodes()]
+                edge_colors = ['blue' for _ in G.edges()]
+                edge_widths = [3 for _ in G.edges()]
+                ax.clear()
+                nx.draw_networkx_nodes(G, self.pos, ax=ax, node_color=node_colors, node_size=800)
+                nx.draw_networkx_labels(G, self.pos, ax=ax, font_size=10)
+                nx.draw_networkx_edges(G, self.pos, ax=ax, edge_color=edge_colors, width=edge_widths)
+                edge_labels = {(u, v): str(d['weight']) for u, v, d in G.edges(data=True)}
+                nx.draw_networkx_edge_labels(G, self.pos, ax=ax, edge_labels=edge_labels)
+                ax.set_title("Minimum Spanning Tree (static view)")
+                ax.axis('off')
+                self.current_figure.canvas.draw_idle()
 
     def kruskal_visualizer(self, graph, mst):
-        """Visualize Kruskal's algorithm with step-by-step animation"""
+        """Visualize Kruskal's algorithm with step-by-step animation and draggable nodes"""
         G = nx.Graph()
         for node, neighbors in graph.items():
             for neighbor, weight in neighbors.items():
                 G.add_edge(node, neighbor, weight=weight)
         
-        # Store positions as instance variables for access in callbacks
         self.pos = nx.spring_layout(G)
         self.G = G
         self.current_frame = 0
@@ -437,33 +530,23 @@ class KruskalPage(QWidget):
             root_v = self.find_vis(parent, v)
             
             if root_u != root_v:
-                # This edge will be added to MST
                 mst_edges.add((u, v))
                 mst_edges.add((v, u))
-                
-                # Union the sets
                 if rank[root_u] > rank[root_v]:
                     parent[root_v] = root_u
                 else:
                     parent[root_u] = root_v
                     if rank[root_u] == rank[root_v]:
                         rank[root_v] += 1
-                
-                # Take snapshot for animation
                 steps.append((u, v, weight, mst_edges.copy()))
         
-        # Animation update function
         def update(frame):
             self.current_frame = frame
             ax.clear()
             
             if frame < len(steps):
                 u, v, weight, current_mst_edges = steps[frame]
-                
-                # Prepare node colors (all same in Kruskal's)
                 node_colors = ['lightblue' for _ in G.nodes()]
-                
-                # Prepare edge colors and widths
                 edge_colors = []
                 edge_widths = []
                 for edge in G.edges():
@@ -476,84 +559,63 @@ class KruskalPage(QWidget):
                     else:
                         edge_colors.append('gray')
                         edge_widths.append(1)
-                
-                # Draw the graph
                 nx.draw_networkx_nodes(G, self.pos, ax=ax, node_color=node_colors, node_size=800)
                 nx.draw_networkx_labels(G, self.pos, ax=ax, font_size=10)
                 nx.draw_networkx_edges(G, self.pos, ax=ax, edge_color=edge_colors, width=edge_widths)
-                
-                # Draw edge labels
                 edge_labels = {(u, v): str(d['weight']) for u, v, d in G.edges(data=True)}
                 nx.draw_networkx_edge_labels(G, self.pos, ax=ax, edge_labels=edge_labels)
-                
                 ax.set_title(f"Step {frame+1}/{len(steps)}: Adding edge {u}-{v} (weight: {weight})\n"
                            f"MST edges: {len(current_mst_edges)//2}")
             else:
-                # Final state - show complete MST
                 node_colors = ['lightgreen' for _ in G.nodes()]
                 edge_colors = ['blue' if edge in mst_edges or (edge[1], edge[0]) in mst_edges else 'gray' 
                              for edge in G.edges()]
                 edge_widths = [3 if edge in mst_edges or (edge[1], edge[0]) in mst_edges else 1 
                              for edge in G.edges()]
-                
-                # Draw the graph
                 nx.draw_networkx_nodes(G, self.pos, ax=ax, node_color=node_colors, node_size=800)
                 nx.draw_networkx_labels(G, self.pos, ax=ax, font_size=10)
                 nx.draw_networkx_edges(G, self.pos, ax=ax, edge_color=edge_colors, width=edge_widths)
-                
-                # Draw edge labels
                 edge_labels = {(u, v): str(d['weight']) for u, v, d in G.edges(data=True)}
                 nx.draw_networkx_edge_labels(G, self.pos, ax=ax, edge_labels=edge_labels)
-                
                 total_weight = sum(d['weight'] for u, v, d in G.edges(data=True) 
                              if (u, v) in mst_edges or (v, u) in mst_edges) // 2
                 ax.set_title(f"Minimum Spanning Tree Complete! (Kruskal's)\nTotal weight: {total_weight}")
-            
             ax.axis('off')
         
-        # Store update function for reset
         self.update = update
-        
-        # Mouse event handlers for dragging nodes
+
+        # Mouse event handlers for dragging nodes (always enabled)
         def on_press(event):
-            if event.inaxes != ax or not self.paused:
+            if event.inaxes != ax:
                 return
-            
-            # Find if a node was clicked
             for node in G.nodes():
                 x, y = self.pos[node]
-                if (x - event.xdata)**2 + (y - event.ydata)**2 < 0.01:  # Click radius
+                if (x - event.xdata)**2 + (y - event.ydata)**2 < 0.01:
                     self.selected_node = node
                     self.offset = (x - event.xdata, y - event.ydata)
                     break
-    
+
         def on_motion(event):
             if not hasattr(self, 'selected_node') or self.selected_node is None or event.inaxes != ax:
                 return
-            
-            # Update node position
             self.pos[self.selected_node] = (event.xdata + self.offset[0], event.ydata + self.offset[1])
-            
-            # Redraw the current frame
             update(self.current_frame)
             fig.canvas.draw_idle()
-    
+
         def on_release(event):
             if hasattr(self, 'selected_node'):
                 self.selected_node = None
-        
-        # Connect the event handlers
+
         fig.canvas.mpl_connect('button_press_event', on_press)
         fig.canvas.mpl_connect('motion_notify_event', on_motion)
         fig.canvas.mpl_connect('button_release_event', on_release)
         
-        # Create animation
         ani = FuncAnimation(fig, update, frames=len(steps)+1,
-                          interval=1500, repeat=False)  # 1.5 seconds per step
+                          interval=1500, repeat=False)
         
         plt.show(block=False)
         return fig, ani
-    
+
     def find_vis(self, parent, node):
         """Find with path compression for visualization"""
         if parent[node] != node:
@@ -562,13 +624,10 @@ class KruskalPage(QWidget):
             
     def go_back(self):
         """Return to the graph menu"""
-        # Clean up any existing plots
         if self.current_figure:
             plt.close(self.current_figure)
         if self.animation and self.animation.event_source:
             self.animation.event_source.stop()
-        
-        # Find and switch to graph menu
         for index in range(self.stack.count()):
             widget = self.stack.widget(index)
             if widget.__class__.__name__ == "GraphMenu":

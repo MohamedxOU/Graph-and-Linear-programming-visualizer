@@ -16,29 +16,26 @@ class LPMenu(QWidget):
         button_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         button_layout.setSpacing(15)
         
-        # Simplex Method (with navigation)
-        self.btn_simplex = QPushButton("Simplex Method")
-        self.btn_simplex.clicked.connect(self.go_to_simplex)
-        self.btn_simplex.setObjectName("algorithmButton")
-        button_layout.addWidget(self.btn_simplex)
-
-        # Ellipsoid Method (placeholder)
-        self.btn_ellipsoid = QPushButton("Ellipsoid Method")
-        self.btn_ellipsoid.setObjectName("algorithmButton")
-        self.btn_ellipsoid.setEnabled(False)
-        button_layout.addWidget(self.btn_ellipsoid)
-
-        # Interior-Point Method (placeholder)
-        self.btn_interior = QPushButton("Interior-Point Method")
-        self.btn_interior.setObjectName("algorithmButton")
-        self.btn_interior.setEnabled(False)
-        button_layout.addWidget(self.btn_interior)
-
-        # Column Generation (placeholder)
-        self.btn_column = QPushButton("Column Generation")
-        self.btn_column.setObjectName("algorithmButton")
-        self.btn_column.setEnabled(False)
-        button_layout.addWidget(self.btn_column)
+        
+        #Standard Simplex Method (with navigation)
+        self.btn_standard_simplex = QPushButton("Standard Simplex Method (≤ constraints only)")
+        self.btn_standard_simplex.clicked.connect(self.go_to_standard_simplex)
+        self.btn_standard_simplex.setObjectName("algorithmButton")
+        button_layout.addWidget(self.btn_standard_simplex)
+        
+        # Two-Phase Simplex Method (with navigation)
+        self.btn_two_phase_simplex = QPushButton("Two-Phase Simplex Method (Mixed Constraints)")
+        self.btn_two_phase_simplex.clicked.connect(self.go_to_two_phase_simplex)
+        self.btn_two_phase_simplex.setObjectName("algorithmButton")
+        button_layout.addWidget(self.btn_two_phase_simplex)
+        
+        #revised simplex method
+        self.btn_revised_simplex = QPushButton("Revised Simplex Method (Standard Form)")
+        self.btn_revised_simplex.clicked.connect(self.go_to_revised_simplex)
+        self.btn_revised_simplex.setObjectName("algorithmButton")
+        button_layout.addWidget(self.btn_revised_simplex)
+        
+        
         
         # Add spacers
         main_layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
@@ -85,15 +82,39 @@ class LPMenu(QWidget):
             }
         """)
 
-    def go_to_simplex(self):
+   
+    
+    def go_to_standard_simplex(self):
         try:
-            from ui.simplex_page import SimplexPage
-            simplex_page = SimplexPage(self.stack)
-            self.stack.addWidget(simplex_page)
-            self.stack.setCurrentWidget(simplex_page)
+            from ui.standard_simplex_page import StandardSimplexPage
+            standard_simplex_page = StandardSimplexPage(self.stack)
+            self.stack.addWidget(standard_simplex_page)
+            self.stack.setCurrentWidget(standard_simplex_page)
         except Exception as e:
             from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.critical(self, "Error", f"Failed to load Simplex page: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Failed to load Standard Simplex page: {str(e)}")
+    
+    # go to two phase simplex page
+    def go_to_two_phase_simplex(self):
+        try:
+            from ui.two_phase_simplex_page import TwoPhaseSimplexPage
+            two_phase_simplex_page = TwoPhaseSimplexPage(self.stack)
+            self.stack.addWidget(two_phase_simplex_page)
+            self.stack.setCurrentWidget(two_phase_simplex_page)
+        except Exception as e:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", f"Failed to load Two-Phase Simplex page: {str(e)}")
+    
+    #revised simplex method
+    def go_to_revised_simplex(self):
+        try:
+            from ui.revised_simplex_page import RevisedSimplexPage
+            revised_simplex_page = RevisedSimplexPage(self.stack)
+            self.stack.addWidget(revised_simplex_page)
+            self.stack.setCurrentWidget(revised_simplex_page)
+        except Exception as e:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", f"Failed to load Revised Simplex page: {str(e)}")
 
     def go_back(self):
         for index in range(self.stack.count()):
