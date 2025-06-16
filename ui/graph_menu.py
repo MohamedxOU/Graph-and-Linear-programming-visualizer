@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, 
-                            QHBoxLayout, QSpacerItem, QSizePolicy)
+                            QHBoxLayout, QSpacerItem, QSizePolicy, QLabel)
 from PyQt6.QtCore import Qt
 
 class GraphMenu(QWidget):
@@ -10,90 +10,113 @@ class GraphMenu(QWidget):
 
     def init_ui(self):
         main_layout = QVBoxLayout()
+        main_layout.setSpacing(10)
         
-        # Button layout for algorithm choices
-        button_layout = QVBoxLayout()
-        button_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        button_layout.setSpacing(15)
-        
+        header = QLabel("Les algorithmes de graphes")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header.setObjectName("headerLabel")
+        main_layout.addWidget(header)
+
+        # --- Parcours Section ---
+        parcours_label = QLabel("Parcours (Traversal)")
+        parcours_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        parcours_label.setStyleSheet("font-weight: bold; font-size: 15px; margin-top: 10px;")
+        main_layout.addWidget(parcours_label)
+
+        parcours_layout = QHBoxLayout()
         self.btn_bfs = QPushButton("BFS Algorithm")
         self.btn_bfs.clicked.connect(self.go_to_bfs)
         self.btn_bfs.setObjectName("algorithmButton")
-        button_layout.addWidget(self.btn_bfs)
+        parcours_layout.addWidget(self.btn_bfs)
 
         self.btn_dfs = QPushButton("DFS Algorithm")
         self.btn_dfs.clicked.connect(self.go_to_dfs)
         self.btn_dfs.setObjectName("algorithmButton")
-        button_layout.addWidget(self.btn_dfs)
+        parcours_layout.addWidget(self.btn_dfs)
+        main_layout.addLayout(parcours_layout)
 
-        self.btn_coloring = QPushButton("Greedy Coloring Algorithm")
+        # --- Coloring Section ---
+        coloring_label = QLabel("Coloration (Coloring)")
+        coloring_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        coloring_label.setStyleSheet("font-weight: bold; font-size: 15px; margin-top: 10px;")
+        main_layout.addWidget(coloring_label)
+
+        coloring_layout = QHBoxLayout()
+        self.btn_coloring = QPushButton("Greedy Coloring")
         self.btn_coloring.clicked.connect(self.go_to_coloring)
         self.btn_coloring.setObjectName("algorithmButton")
-        button_layout.addWidget(self.btn_coloring)
-        
-        #Welsh-Powell Coloring Algorithm
-        self.btn_welsh_powell = QPushButton("Welsh-Powell Coloring Algorithm")
+        coloring_layout.addWidget(self.btn_coloring)
+
+        self.btn_welsh_powell = QPushButton("Welsh-Powell Coloring")
         self.btn_welsh_powell.clicked.connect(self.go_to_welsh_powell)
         self.btn_welsh_powell.setObjectName("algorithmButton")
-        button_layout.addWidget(self.btn_welsh_powell)
-        
-        #prim algorithm
-        self.btn_prim = QPushButton("Prim's Algorithm")
-        self.btn_prim.clicked.connect(self.go_to_prim)  # Assuming this is a placeholder
-        self.btn_prim.setObjectName("algorithmButton")  # Added missing styling
-        button_layout.addWidget(self.btn_prim)  # Add to button_layout, not undefined 'layout'
-        
-        #kruskal algorithm
-        self.btn_kruskal = QPushButton("Kruskal's Algorithm")
-        self.btn_kruskal.clicked.connect(self.go_to_kruskal)
-        self.btn_kruskal.setObjectName("algorithmButton")  # Added missing styling
-        button_layout.addWidget(self.btn_kruskal)  # Add to button_layout, not undefined 'layout'
-        
-        #bellman-ford algorithm
-        self.btn_bellman_ford = QPushButton("Bellman-Ford Algorithm")
-        self.btn_bellman_ford.clicked.connect(self.go_to_bellman_ford)
-        self.btn_bellman_ford.setObjectName("algorithmButton")  # Added missing styling
-        button_layout.addWidget(self.btn_bellman_ford)  # Add to button_layout, not undefined 'layout'
-        
-        
-        # Dijkstra's Algorithm
+        coloring_layout.addWidget(self.btn_welsh_powell)
+        main_layout.addLayout(coloring_layout)
+
+        # --- Shortest Path Section ---
+        shortest_label = QLabel("Plus court chemin (Shortest Path)")
+        shortest_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        shortest_label.setStyleSheet("font-weight: bold; font-size: 15px; margin-top: 10px;")
+        main_layout.addWidget(shortest_label)
+
+        shortest_layout = QHBoxLayout()
         self.btn_dijkstra = QPushButton("Dijkstra's Algorithm")
         self.btn_dijkstra.clicked.connect(self.go_to_dijkstra)
-        self.btn_dijkstra.setObjectName("algorithmButton")  # Added missing styling
-        button_layout.addWidget(self.btn_dijkstra)  # Add to button_layout, not undefined 'layout'
-        
-        #ford-fulkerson algorithm
+        self.btn_dijkstra.setObjectName("algorithmButton")
+        shortest_layout.addWidget(self.btn_dijkstra)
+
+        self.btn_bellman_ford = QPushButton("Bellman-Ford Algorithm")
+        self.btn_bellman_ford.clicked.connect(self.go_to_bellman_ford)
+        self.btn_bellman_ford.setObjectName("algorithmButton")
+        shortest_layout.addWidget(self.btn_bellman_ford)
+
+       
+        main_layout.addLayout(shortest_layout)
+
+        # --- Minimum Spanning Tree Section ---
+        mst_label = QLabel("Arbre couvrant minimal (MST)")
+        mst_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        mst_label.setStyleSheet("font-weight: bold; font-size: 15px; margin-top: 10px;")
+        main_layout.addWidget(mst_label)
+
+        mst_layout = QHBoxLayout()
+        self.btn_prim = QPushButton("Prim's Algorithm")
+        self.btn_prim.clicked.connect(self.go_to_prim)
+        self.btn_prim.setObjectName("algorithmButton")
+        mst_layout.addWidget(self.btn_prim)
+
+        self.btn_kruskal = QPushButton("Kruskal's Algorithm")
+        self.btn_kruskal.clicked.connect(self.go_to_kruskal)
+        self.btn_kruskal.setObjectName("algorithmButton")
+        mst_layout.addWidget(self.btn_kruskal)
+        main_layout.addLayout(mst_layout)
+
+        # --- Flow Section ---
+        flow_label = QLabel("Flot maximal (Max Flow)")
+        flow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        flow_label.setStyleSheet("font-weight: bold; font-size: 15px; margin-top: 10px;")
+        main_layout.addWidget(flow_label)
+
+        flow_layout = QHBoxLayout()
         self.btn_ford_fulkerson = QPushButton("Ford-Fulkerson Algorithm")
         self.btn_ford_fulkerson.clicked.connect(self.go_to_ford_fulkerson)
-        self.btn_ford_fulkerson.setObjectName("algorithmButton")  # Added missing styling
-        button_layout.addWidget(self.btn_ford_fulkerson)  # Add to button_layout, not undefined 'layout'
-        
-        # A* Algorithm
-        self.btn_astar = QPushButton("A* Algorithm")
-        self.btn_astar.clicked.connect(self.go_to_astar)
-        self.btn_astar.setObjectName("algorithmButton")
-        button_layout.addWidget(self.btn_astar)
+        self.btn_ford_fulkerson.setObjectName("algorithmButton")
+        flow_layout.addWidget(self.btn_ford_fulkerson)
+        main_layout.addLayout(flow_layout)
 
-        
-        # Add spacer to center the buttons vertically
+        # Spacer and back button
         main_layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-        main_layout.addLayout(button_layout)
-        main_layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-        
-        # Bottom layout for back button
         bottom_layout = QHBoxLayout()
         bottom_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
-        
         self.btn_back = QPushButton("← Back to Home")
         self.btn_back.clicked.connect(self.go_back)
         self.btn_back.setObjectName("backButton")
         bottom_layout.addWidget(self.btn_back)
-        
         main_layout.addLayout(bottom_layout)
-        
+
         self.setLayout(main_layout)
-        
-        # Apply styling
+
+        # Styling (keep your existing style)
         self.setStyleSheet("""
             #algorithmButton {
                 background-color: #5E81AC;
@@ -117,6 +140,8 @@ class GraphMenu(QWidget):
                 background-color: #5E81AC;
             }
         """)
+
+    # ... keep your navigation methods unchanged ...
 
     def go_to_bfs(self):
         from ui.bfs_page import BFSPage
@@ -180,8 +205,3 @@ class GraphMenu(QWidget):
         self.stack.addWidget(ford_fulkerson_page)
         self.stack.setCurrentWidget(ford_fulkerson_page)
     
-    def go_to_astar(self):
-        from ui.astar_page import AStarPage
-        astar_page = AStarPage(self.stack)
-        self.stack.addWidget(astar_page)
-        self.stack.setCurrentWidget(astar_page)

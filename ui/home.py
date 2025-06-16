@@ -13,7 +13,7 @@ class HomePage(QWidget):
         main_layout.setContentsMargins(40, 40, 40, 40)  # Add some margin around the edges
         
         # Header section
-        header = QLabel("Algorithm Visualizer")
+        header = QLabel("Les algorithmes de graphes et de programmation linéaire")
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.setObjectName("headerLabel")
         main_layout.addWidget(header)
@@ -26,12 +26,12 @@ class HomePage(QWidget):
         button_layout.setSpacing(20)  # Space between buttons
         button_layout.setContentsMargins(60, 0, 60, 0)  # Left/right margins
         
-        self.btn_graph = QPushButton("Graph Algorithms")
+        self.btn_graph = QPushButton("Algorithms de Graphes")
         self.btn_graph.clicked.connect(self.go_to_graph_menu)
         self.btn_graph.setObjectName("mainMenuButton")
         button_layout.addWidget(self.btn_graph)
 
-        self.btn_lp = QPushButton("Linear Programming Algorithms")
+        self.btn_lp = QPushButton("Programmation Linéaire")
         self.btn_lp.clicked.connect(self.go_to_lp_menu)
         self.btn_lp.setObjectName("mainMenuButton")
         button_layout.addWidget(self.btn_lp)
@@ -42,7 +42,7 @@ class HomePage(QWidget):
         main_layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         
         # Footer note
-        footer = QLabel("Select an algorithm category to begin")
+        footer = QLabel("selectionnez pour commencer")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         footer.setObjectName("footerLabel")
         main_layout.addWidget(footer)

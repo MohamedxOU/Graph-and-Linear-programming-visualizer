@@ -34,6 +34,8 @@ def dfs(graphe, noeud_depart, visite=None):
 
     return chemin
 
+
+
 " Algorithme Coloration Glouton "
 "  "
 def coloration_glouton(graphe):
@@ -94,64 +96,6 @@ def dijkstra(graph, start):
                 heapq.heappush(priority_queue, (distance, neighbor))
     
     return distances, previous_nodes
-
-
-
-
-
-
-
-
-def a_star(graph, start, end, heuristic):
-    """
-    A* pathfinding algorithm
-    Args:
-        graph: Dict {node: {neighbor: cost}}
-        start: Starting node
-        end: Target node
-        heuristic: Dict {node: estimated_distance_to_end}
-    """
-    open_set = []
-    heapq.heappush(open_set, (0, start))
-    came_from = {}
-    g_score = {node: float('inf') for node in graph}
-    g_score[start] = 0
-    f_score = {node: float('inf') for node in graph}
-    f_score[start] = heuristic[start]
-    
-    open_set_hash = {start}
-    
-    while open_set:
-        current = heapq.heappop(open_set)[1]
-        open_set_hash.remove(current)
-        
-        if current == end:
-            return reconstruct_path_as(came_from, end)
-            
-        for neighbor, cost in graph[current].items():
-            tentative_g_score = g_score[current] + cost
-            
-            if tentative_g_score < g_score[neighbor]:
-                came_from[neighbor] = current
-                g_score[neighbor] = tentative_g_score
-                f_score[neighbor] = tentative_g_score + heuristic[neighbor]
-                if neighbor not in open_set_hash:
-                    heapq.heappush(open_set, (f_score[neighbor], neighbor))
-                    open_set_hash.add(neighbor)
-    
-    return None  # No path found
-
-def reconstruct_path_as(came_from, current):
-    total_path = [current]
-    while current in came_from:
-        current = came_from[current]
-        total_path.append(current)
-    return total_path[::-1]
-
-
-
-
-
 
 
 
